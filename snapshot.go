@@ -146,3 +146,67 @@ func buildSnapshot(nodes []rawAXNode, filter string, maxDepth int) ([]A11yNode, 
 
 	return flat, refs
 }
+
+// formatSnapshotText renders nodes as an indented text tree.
+// Much cheaper on tokens than JSON (~40-60% reduction).
+func formatSnapshotText(nodes []A11yNode) string {
+	var b strings.Builder
+	for _, n := range nodes {
+		for i := 0; i < n.Depth; i++ {
+			b.WriteString("  ")
+		}
+		b.WriteString(n.Ref)
+		b.WriteByte(' ')
+		b.WriteString(n.Role)
+		if n.Name != "" {
+			b.WriteString(` "`)
+			b.WriteString(n.Name)
+			b.WriteByte('"')
+		}
+		if n.Value != "" {
+			b.WriteString(` val="`)
+			b.WriteString(n.Value)
+			b.WriteByte('"')
+		}
+		if n.Focused {
+			b.WriteString(" [focused]")
+		}
+		if n.Disabled {
+			b.WriteString(" [disabled]")
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// diffSnapshot returns only nodes that changed between prev and current snapshots.
+// A node is "changed" if it's new, removed, or has different name/value/focused/disabled.
+// Returns added, changed, and removed nodes.
+func diffSnapshot(prev, curr []A11yNode) (added, changed, removed []A11yNode) {
+	prevMap := make(map[string]A11yNode, len(prev))
+	for _, n := range prev {
+		key := fmt.Sprintf("%s:%s:%d", n.Role, n.Name, n.NodeID)
+		prevMap[key] = n
+	}
+
+	currMap := make(map[string]bool, len(curr))
+	for _, n := range curr {
+		key := fmt.Sprintf("%s:%s:%d", n.Role, n.Name, n.NodeID)
+		currMap[key] = true
+		old, existed := prevMap[key]
+		if !existed {
+			added = append(added, n)
+		} else if old.Value != n.Value || old.Focused != n.Focused || old.Disabled != n.Disabled {
+			changed = append(changed, n)
+		}
+	}
+
+	for _, n := range prev {
+		key := fmt.Sprintf("%s:%s:%d", n.Role, n.Name, n.NodeID)
+		if !currMap[key] {
+			removed = append(removed, n)
+		}
+	}
+
+	return
+}

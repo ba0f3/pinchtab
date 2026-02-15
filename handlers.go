@@ -50,6 +50,8 @@ func (b *Bridge) handleTabs(w http.ResponseWriter, r *http.Request) {
 func (b *Bridge) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	tabID := r.URL.Query().Get("tabId")
 	filter := r.URL.Query().Get("filter")
+	doDiff := r.URL.Query().Get("diff") == "true"
+	format := r.URL.Query().Get("format") // "text" for indented tree
 	maxDepthStr := r.URL.Query().Get("depth")
 	maxDepth := -1
 	if maxDepthStr != "" {
@@ -89,9 +91,19 @@ func (b *Bridge) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	flat, refs := buildSnapshot(treeResp.Nodes, filter, maxDepth)
 
-	// Cache ref→nodeID mapping for this tab
+	// Get previous snapshot for diff before overwriting cache
+	var prevNodes []A11yNode
+	if doDiff {
+		b.mu.RLock()
+		if prev := b.snapshots[resolvedTabID]; prev != nil {
+			prevNodes = prev.nodes
+		}
+		b.mu.RUnlock()
+	}
+
+	// Cache ref→nodeID mapping and nodes for this tab
 	b.mu.Lock()
-	b.snapshots[resolvedTabID] = &refCache{refs: refs}
+	b.snapshots[resolvedTabID] = &refCache{refs: refs, nodes: flat}
 	b.mu.Unlock()
 
 	var url, title string
@@ -99,6 +111,33 @@ func (b *Bridge) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 		chromedp.Location(&url),
 		chromedp.Title(&title),
 	)
+
+	if doDiff && prevNodes != nil {
+		added, changed, removed := diffSnapshot(prevNodes, flat)
+		jsonResp(w, 200, map[string]any{
+			"url":     url,
+			"title":   title,
+			"diff":    true,
+			"added":   added,
+			"changed": changed,
+			"removed": removed,
+			"counts": map[string]int{
+				"added":   len(added),
+				"changed": len(changed),
+				"removed": len(removed),
+				"total":   len(flat),
+			},
+		})
+		return
+	}
+
+	if format == "text" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(200)
+		fmt.Fprintf(w, "# %s\n# %s\n# %d nodes\n\n", title, url, len(flat))
+		w.Write([]byte(formatSnapshotText(flat)))
+		return
+	}
 
 	jsonResp(w, 200, map[string]any{
 		"url":   url,
@@ -251,7 +290,11 @@ type actionRequest struct {
 	Selector string `json:"selector"`
 	Text     string `json:"text"`
 	Key      string `json:"key"`
+	Value    string `json:"value"`
 	NodeID   int64  `json:"nodeId"`
+	ScrollX  int    `json:"scrollX"`
+	ScrollY  int    `json:"scrollY"`
+	WaitNav  bool   `json:"waitNav"`
 }
 
 // ActionFunc handles a single action kind. Receives the full request for
@@ -261,13 +304,22 @@ type ActionFunc func(ctx context.Context, req actionRequest) (map[string]any, er
 func (b *Bridge) actionRegistry() map[string]ActionFunc {
 	return map[string]ActionFunc{
 		actionClick: func(ctx context.Context, req actionRequest) (map[string]any, error) {
+			var err error
 			if req.Selector != "" {
-				return map[string]any{"clicked": true}, chromedp.Run(ctx, chromedp.Click(req.Selector, chromedp.ByQuery))
+				err = chromedp.Run(ctx, chromedp.Click(req.Selector, chromedp.ByQuery))
+			} else if req.NodeID > 0 {
+				err = clickByNodeID(ctx, req.NodeID)
+			} else {
+				return nil, fmt.Errorf("need selector, ref, or nodeId")
 			}
-			if req.NodeID > 0 {
-				return map[string]any{"clicked": true}, clickByNodeID(ctx, req.NodeID)
+			if err != nil {
+				return nil, err
 			}
-			return nil, fmt.Errorf("need selector, ref, or nodeId")
+			// Optional: wait for navigation after click (e.g. link clicks)
+			if req.WaitNav {
+				chromedp.Run(ctx, chromedp.Sleep(waitNavDelay))
+			}
+			return map[string]any{"clicked": true}, nil
 		},
 		actionType: func(ctx context.Context, req actionRequest) (map[string]any, error) {
 			if req.Text == "" {
@@ -309,6 +361,50 @@ func (b *Bridge) actionRegistry() map[string]ActionFunc {
 				)
 			}
 			return map[string]any{"focused": true}, nil
+		},
+		actionHover: func(ctx context.Context, req actionRequest) (map[string]any, error) {
+			if req.NodeID > 0 {
+				return map[string]any{"hovered": true}, hoverByNodeID(ctx, req.NodeID)
+			}
+			if req.Selector != "" {
+				return map[string]any{"hovered": true}, chromedp.Run(ctx,
+					chromedp.Evaluate(fmt.Sprintf(`document.querySelector(%q)?.dispatchEvent(new MouseEvent('mouseover', {bubbles:true}))`, req.Selector), nil),
+				)
+			}
+			return nil, fmt.Errorf("need selector or ref")
+		},
+		actionSelect: func(ctx context.Context, req actionRequest) (map[string]any, error) {
+			val := req.Value
+			if val == "" {
+				val = req.Text // fallback
+			}
+			if val == "" {
+				return nil, fmt.Errorf("value required for select")
+			}
+			if req.NodeID > 0 {
+				return map[string]any{"selected": val}, selectByNodeID(ctx, req.NodeID, val)
+			}
+			if req.Selector != "" {
+				return map[string]any{"selected": val}, chromedp.Run(ctx,
+					chromedp.SetValue(req.Selector, val, chromedp.ByQuery),
+				)
+			}
+			return nil, fmt.Errorf("need selector or ref")
+		},
+		actionScroll: func(ctx context.Context, req actionRequest) (map[string]any, error) {
+			// Scroll to element
+			if req.NodeID > 0 {
+				return map[string]any{"scrolled": true}, scrollByNodeID(ctx, req.NodeID)
+			}
+			// Scroll by pixel amount
+			if req.ScrollX != 0 || req.ScrollY != 0 {
+				js := fmt.Sprintf("window.scrollBy(%d, %d)", req.ScrollX, req.ScrollY)
+				return map[string]any{"scrolled": true, "x": req.ScrollX, "y": req.ScrollY},
+					chromedp.Run(ctx, chromedp.Evaluate(js, nil))
+			}
+			// Default: scroll down one viewport
+			return map[string]any{"scrolled": true, "y": 800},
+				chromedp.Run(ctx, chromedp.Evaluate("window.scrollBy(0, 800)", nil))
 		},
 	}
 }

@@ -17,11 +17,12 @@ type TabEntry struct {
 	cancel context.CancelFunc
 }
 
-// refCache stores the ref→backendNodeID mapping from the last snapshot per tab.
+// refCache stores the ref→backendNodeID mapping and the last snapshot nodes per tab.
 // Refs are assigned during /snapshot and looked up during /action, avoiding
 // a second a11y tree fetch that could drift.
 type refCache struct {
-	refs map[string]int64 // "e0" → backendNodeID
+	refs  map[string]int64 // "e0" → backendNodeID
+	nodes []A11yNode       // last snapshot for diff
 }
 
 // Bridge is the central state holder for the Chrome connection, tab contexts,

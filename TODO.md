@@ -61,19 +61,23 @@ Split into 8 files (single package):
 - [x] Add config tests — envOr, homeDir, constants
 - [x] **18 tests passing** — `go test ./...`
 
-## P5: Bugs & Stealth
-- [ ] **Remove `--disable-blink-features=AutomationControlled` flag** — deprecated in Chrome 144+, triggers warning banner in headed mode, hurts stealth. JS injection already patches `navigator.webdriver`
+## Done ✅ (P5)
+- [x] **`withElement` helper** — generic `withElement(ctx, nodeID, jsFunc)` + `withElementArg` for all element actions
+- [x] **`hover` action** — mouseover/mouseenter via ref, selector
+- [x] **`select` action** — pick `<select>` option by value or text, fires change event
+- [x] **`scroll` action** — scroll to element (ref), by pixel amount (`scrollX`/`scrollY`), or default 800px down
+- [x] **Smart diff** — `?diff=true` returns added/changed/removed nodes since last snapshot
+- [x] **Wait for navigation** — `"waitNav": true` on click action, 1s delay for page load
+- [x] **Text format** — `?format=text` returns indented tree (~40-60% fewer tokens than JSON)
+- [x] **21 tests passing** — diff, text format, all existing tests green
 
-## P6: Features
-- [ ] **`/scroll` endpoint** — scroll to element or by amount. Needed for infinite-scroll pages (X, Reddit).
-- [ ] **`withElement` helper** — generic `withElement(ctx, nodeID, jsFunc)` for all element actions (click, type, scroll, hover, drag)
-- [ ] **Smart diff** — `?diff=true` returns only changes since last snapshot. Massive token savings on multi-step tasks
-- [ ] **Wait for navigation** — after click, wait for page load before returning
+## P5 Remaining
+
+## P5 Bugs & Stealth
+- [ ] **Remove `--disable-blink-features=AutomationControlled` flag** — deprecated in Chrome 144+, triggers warning banner in headed mode, hurts stealth. JS injection already patches `navigator.webdriver`
 - [ ] **Better /text** — Readability-style extraction instead of raw innerText
 - [ ] **Split handlers.go** — snapshot handler is complex enough for its own file
 - [ ] **Wire interfaces into handlers** — Inject Browser/TabManager so handler tests don't need Chrome
-- [ ] **`hover` action** — mouseover for dropdowns/tooltips (common on X, Google)
-- [ ] **`select` action** — pick option from `<select>` dropdowns by value or text
 
 ## P7: Nice to Have
 - [ ] **File-based output** — `?output=file` saves snapshot to disk, returns path (Playwright CLI approach)
@@ -83,7 +87,6 @@ Split into 8 files (single package):
 - [ ] **Config file** — `~/.pinchtab/config.json`
 - [ ] **LaunchAgent/systemd** — auto-start on boot
 - [ ] **`/cookies` endpoint** — read/set cookies (useful for auth debugging)
-- [ ] **Snapshot text format** — `?format=text` returns indented tree instead of JSON (even cheaper tokens)
 
 ## Not Doing
 - Plugin system

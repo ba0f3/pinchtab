@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -143,6 +144,65 @@ func TestBuildSnapshotInteractiveFilter(t *testing.T) {
 	}
 	if flat[0].Role != "button" {
 		t.Errorf("expected button, got %s", flat[0].Role)
+	}
+}
+
+func TestFormatSnapshotText(t *testing.T) {
+	nodes := []A11yNode{
+		{Ref: "e0", Role: "WebArea", Name: "Page", Depth: 0},
+		{Ref: "e1", Role: "button", Name: "Submit", Depth: 1},
+		{Ref: "e2", Role: "textbox", Name: "Email", Depth: 1, Value: "test@x.com", Focused: true},
+		{Ref: "e3", Role: "button", Name: "Cancel", Depth: 1, Disabled: true},
+	}
+
+	text := formatSnapshotText(nodes)
+
+	if !strings.Contains(text, `e0 WebArea "Page"`) {
+		t.Error("missing root node")
+	}
+	if !strings.Contains(text, `  e1 button "Submit"`) {
+		t.Error("missing indented button")
+	}
+	if !strings.Contains(text, `val="test@x.com"`) {
+		t.Error("missing value")
+	}
+	if !strings.Contains(text, "[focused]") {
+		t.Error("missing focused flag")
+	}
+	if !strings.Contains(text, "[disabled]") {
+		t.Error("missing disabled flag")
+	}
+}
+
+func TestDiffSnapshot(t *testing.T) {
+	prev := []A11yNode{
+		{Ref: "e0", Role: "button", Name: "Submit", NodeID: 10},
+		{Ref: "e1", Role: "textbox", Name: "Email", NodeID: 20, Value: ""},
+		{Ref: "e2", Role: "link", Name: "Old Link", NodeID: 30},
+	}
+	curr := []A11yNode{
+		{Ref: "e0", Role: "button", Name: "Submit", NodeID: 10},          // unchanged
+		{Ref: "e1", Role: "textbox", Name: "Email", NodeID: 20, Value: "hi"}, // changed (value)
+		{Ref: "e3", Role: "link", Name: "New Link", NodeID: 40},          // added
+	}
+
+	added, changed, removed := diffSnapshot(prev, curr)
+
+	if len(added) != 1 || added[0].Name != "New Link" {
+		t.Errorf("expected 1 added (New Link), got %+v", added)
+	}
+	if len(changed) != 1 || changed[0].Name != "Email" {
+		t.Errorf("expected 1 changed (Email), got %+v", changed)
+	}
+	if len(removed) != 1 || removed[0].Name != "Old Link" {
+		t.Errorf("expected 1 removed (Old Link), got %+v", removed)
+	}
+}
+
+func TestDiffSnapshotEmpty(t *testing.T) {
+	added, changed, removed := diffSnapshot(nil, nil)
+	if len(added) != 0 || len(changed) != 0 || len(removed) != 0 {
+		t.Error("diff of two empty snapshots should be empty")
 	}
 }
 

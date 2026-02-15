@@ -18,11 +18,14 @@ const filterInteractive = "interactive"
 
 // Action kinds for /action endpoint.
 const (
-	actionClick = "click"
-	actionType  = "type"
-	actionFill  = "fill"
-	actionPress = "press"
-	actionFocus = "focus"
+	actionClick  = "click"
+	actionType   = "type"
+	actionFill   = "fill"
+	actionPress  = "press"
+	actionFocus  = "focus"
+	actionHover  = "hover"
+	actionSelect = "select"
+	actionScroll = "scroll"
 )
 
 // Tab actions for /tab endpoint.
@@ -45,6 +48,7 @@ var (
 	actionTimeout   = 15 * time.Second
 	navigateTimeout = 30 * time.Second
 	shutdownTimeout = 10 * time.Second
+	waitNavDelay    = 1 * time.Second
 )
 
 func envOr(key, fallback string) string {
