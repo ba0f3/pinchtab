@@ -215,6 +215,3 @@ Everything else is Go standard library.
 
 Pinchtab is built to work seamlessly with [OpenClaw](https://openclaw.ai) — the open-source personal AI assistant. Use Pinchtab as your agent's browser backend for faster, cheaper web automation.
 
-## License
-
-MIT — Luigi Agosti
