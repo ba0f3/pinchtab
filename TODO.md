@@ -61,7 +61,10 @@ Split into 8 files (single package):
 - [x] Add config tests — envOr, homeDir, constants
 - [x] **18 tests passing** — `go test ./...`
 
-## P5: Features
+## P5: Bugs & Stealth
+- [ ] **Remove `--disable-blink-features=AutomationControlled` flag** — deprecated in Chrome 144+, triggers warning banner in headed mode, hurts stealth. JS injection already patches `navigator.webdriver`
+
+## P6: Features
 - [ ] **`/scroll` endpoint** — scroll to element or by amount. Needed for infinite-scroll pages (X, Reddit).
 - [ ] **`withElement` helper** — generic `withElement(ctx, nodeID, jsFunc)` for all element actions (click, type, scroll, hover, drag)
 - [ ] **Smart diff** — `?diff=true` returns only changes since last snapshot. Massive token savings on multi-step tasks
@@ -72,7 +75,7 @@ Split into 8 files (single package):
 - [ ] **`hover` action** — mouseover for dropdowns/tooltips (common on X, Google)
 - [ ] **`select` action** — pick option from `<select>` dropdowns by value or text
 
-## P6: Nice to Have
+## P7: Nice to Have
 - [ ] **File-based output** — `?output=file` saves snapshot to disk, returns path (Playwright CLI approach)
 - [ ] **Compact format** — YAML or indented text instead of JSON
 - [ ] **Action chaining** — `POST /actions` batch multiple actions in one call
