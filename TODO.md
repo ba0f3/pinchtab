@@ -72,12 +72,12 @@ Split into 8 files (single package):
 - [x] **21 tests passing** — diff, text format, all existing tests green
 
 ## P5 Remaining
-
-## P5 Bugs & Stealth
-- [ ] **Remove `--disable-blink-features=AutomationControlled` flag** — deprecated in Chrome 144+, triggers warning banner in headed mode, hurts stealth. JS injection already patches `navigator.webdriver`
-- [ ] **Better /text** — Readability-style extraction instead of raw innerText
-- [ ] **Split handlers.go** — snapshot handler is complex enough for its own file
 - [ ] **Wire interfaces into handlers** — Inject Browser/TabManager so handler tests don't need Chrome
+
+## Done ✅ (P5b)
+- [x] **Remove `--disable-blink-features=AutomationControlled` flag** — deprecated in Chrome 144+, stealth.js handles it
+- [x] **Better /text** — Readability-style extraction (`readability.js`), strips nav/footer/aside/ads, prefers article/main. `?mode=raw` for old innerText.
+- [x] **Split handlers.go** — snapshot handler extracted to `handler_snapshot.go`
 
 ## P7: Nice to Have
 - [ ] **File-based output** — `?output=file` saves snapshot to disk, returns path (Playwright CLI approach)

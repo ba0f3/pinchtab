@@ -39,7 +39,8 @@ func main() {
 			chromedp.NoDefaultBrowserCheck,
 
 			// Stealth: hide automation indicators
-			chromedp.Flag("disable-blink-features", "AutomationControlled"),
+			// Note: --disable-blink-features=AutomationControlled removed — deprecated
+			// in Chrome 144+, triggers warning banner. stealth.js handles navigator.webdriver.
 			chromedp.Flag("exclude-switches", "enable-automation"),
 			chromedp.Flag("disable-infobars", true),
 
