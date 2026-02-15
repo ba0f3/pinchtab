@@ -19,15 +19,21 @@
 
 ## Why
 
-AI agents need browsers. Current options are either:
-- **Screenshot-based** — expensive (vision model tokens), slow, unreliable
-- **Framework-locked** — MCP-only, Python-only, requires specific agent
-- **Cloud-first** — want you on their servers, not your machine
+Most agent browser tools (OpenClaw, Playwright MCP, Browser Use) are tightly coupled — they only work inside their own framework. If you switch agents or want to script something in bash, you're out of luck.
 
-Pinchtab is different:
-- **Accessibility tree as primary interface** — 4x cheaper than screenshots, works with any LLM
-- **Plain HTTP API** — any agent, any language, even `curl`
-- **Self-contained** — launches its own Chrome, manages the process
+Pinchtab is a standalone HTTP server. Any agent, any language, even `curl`:
+
+```bash
+# Read a page — 800 tokens instead of 10,000
+curl localhost:18800/text?tabId=X
+
+# Click a button by ref from the last snapshot
+curl -X POST localhost:18800/action -d '{"kind":"click","ref":"e5"}'
+```
+
+- **5-13x cheaper** than screenshots or full snapshots for read-heavy tasks ([real measurements](#token-efficiency--real-numbers))
+- **Plain HTTP API** — not locked to any agent framework
+- **Self-contained** — 12MB binary, launches its own Chrome, zero config
 - **Stealth mode** — bypasses bot detection (Google, X/Twitter, etc.)
 - **Persistent sessions** — log in once, stays logged in across restarts
 
