@@ -178,6 +178,14 @@ Everything else is Go standard library.
 
 ## Install
 
+### With your AI agent
+
+> Install Pinchtab and set it up for browser automation.
+
+Your agent can clone, build, and configure Pinchtab using the [OpenClaw skill](skill/pinchtab/SKILL.md). Just ask.
+
+### Manual
+
 ```bash
 # From source
 go install github.com/pinchtab/pinchtab@latest
