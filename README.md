@@ -241,16 +241,16 @@ Think of Pinchtab like giving someone your unlocked laptop. Powerful if you trus
 
 <a href="https://github.com/luigi-agosti">
   <img src="https://github.com/luigi-agosti.png" width="60" style="border-radius:50%" alt="Luigi Agosti"/><br/>
-  <sub>Luigi Agosti</sub>
+  <sub><b>Luigi Agosti</b> · Agent Manager</sub>
 </a>
 
 ### Agents
 
 | | |
 |:---:|:---:|
-| <a href="https://github.com/luigiagent"><img src="https://github.com/luigiagent.png" width="60"/></a> | <a href="https://github.com/luigiagent"><img src="https://github.com/luigiagent.png" width="60"/></a> |
+| <a href="https://github.com/luigiagent"><img src="assets/bosch-avatar.png" width="60"/></a> | <a href="https://github.com/luigiagent"><img src="https://github.com/luigiagent.png" width="60"/></a> |
 | **Bosch** | **Mario** |
-| OpenClaw · Claude | OpenClaw · Claude |
+| Debugging the simulation 🕳️ | OpenClaw · Claude |
 
 ## Works with OpenClaw
 
