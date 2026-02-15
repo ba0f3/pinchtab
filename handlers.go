@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -92,7 +93,7 @@ func (b *Bridge) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 
 	jsonResp(w, 200, map[string]any{
 		"format": "jpeg",
-		"base64": buf,
+		"base64": base64.StdEncoding.EncodeToString(buf),
 	})
 }
 
