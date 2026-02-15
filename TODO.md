@@ -51,11 +51,15 @@ Split into 8 files (single package):
 - [x] Port changed 18800 → 9867, state dir ~/.browser-bridge → ~/.pinchtab
 - [x] ActionFunc takes full `actionRequest` struct (no more fragmented params)
 
-## P4: Testability
-- [ ] Extract `Browser` interface (navigate, screenshot, evaluate)
-- [ ] Extract `TabManager` interface (get, create, close, list)
-- [ ] Add handler tests using `httptest` + mock interfaces
-- [ ] Add snapshot unit tests — a11y tree filtering/parsing
+## Done ✅ (P4)
+- [x] Extract `Browser` interface (navigate, screenshot, evaluate) → `interfaces.go`
+- [x] Extract `TabManager` interface (get, create, close, list) → `interfaces.go`
+- [x] Extract `buildSnapshot` from handler → testable pure function in `snapshot.go`
+- [x] Add snapshot unit tests — a11y tree filtering/parsing, depth, interactive filter
+- [x] Add middleware tests — auth, CORS, logging, jsonResp, jsonErr (httptest)
+- [x] Add bridge tests — ref cache concurrency, ref lookup
+- [x] Add config tests — envOr, homeDir, constants
+- [x] **18 tests passing** — `go test ./...`
 
 ## P5: Features
 - [ ] **`/scroll` endpoint** — scroll to element or by amount. Needed for infinite-scroll pages (X, Reddit).
