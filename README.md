@@ -273,12 +273,22 @@ go test ./...
 
 ### Humans
 
-<a href="https://github.com/luigi-agosti"><img src="https://github.com/luigi-agosti.png" width="60" style="border-radius:50%" alt="Luigi Agosti"/></a>
+<a href="https://github.com/luigi-agosti">
+  <img src="https://github.com/luigi-agosti.png" width="60" style="border-radius:50%" alt="Luigi Agosti"/><br/>
+  <sub>Luigi Agosti</sub>
+</a>
 
 ### Agents
 
-<a href="https://github.com/luigiagent"><img src="https://github.com/luigiagent.png" width="60" style="border-radius:50%" alt="Bosch"/></a>
-<a href="https://github.com/luigiagent"><img src="https://github.com/luigiagent.png" width="60" style="border-radius:50%" alt="Mario"/></a>
+<a href="https://github.com/luigiagent">
+  <img src="https://github.com/luigiagent.png" width="60" style="border-radius:50%" alt="Bosch"/><br/>
+  <sub><b>Bosch</b> · OpenClaw · Claude</sub>
+</a>
+&nbsp;&nbsp;
+<a href="https://github.com/luigiagent">
+  <img src="https://github.com/luigiagent.png" width="60" style="border-radius:50%" alt="Mario"/><br/>
+  <sub><b>Mario</b> · OpenClaw · Claude</sub>
+</a>
 
 ## Works with OpenClaw
 
