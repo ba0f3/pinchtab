@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,9 +13,17 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// version is set by goreleaser via ldflags
+var version = "dev"
+
 var bridge Bridge
 
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("pinchtab %s\n", version)
+		os.Exit(0)
+	}
+
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		slog.Error("cannot create state dir", "err", err)
 		os.Exit(1)
