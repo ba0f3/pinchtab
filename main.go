@@ -88,14 +88,29 @@ func main() {
 		os.MkdirAll(profileDir, 0755)
 		log.Printf("Launching Chrome (profile: %s, headless: %v)", profileDir, headless)
 
-		opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		// Start from minimal opts — DefaultExecAllocatorOptions sets
+		// automation flags that trigger bot detection
+		opts := []chromedp.ExecAllocatorOption{
 			chromedp.UserDataDir(profileDir),
+			chromedp.NoFirstRun,
+			chromedp.NoDefaultBrowserCheck,
+
+			// Stealth: disable automation indicators
+			chromedp.Flag("disable-blink-features", "AutomationControlled"),
+			chromedp.Flag("exclude-switches", "enable-automation"),
+			chromedp.Flag("disable-infobars", true),
 			chromedp.Flag("disable-background-networking", false),
 			chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
+			chromedp.Flag("disable-popup-blocking", true),
 			chromedp.Flag("disable-default-apps", false),
 			chromedp.Flag("no-first-run", true),
-			chromedp.Flag("disable-popup-blocking", true),
-		)
+
+			// Use standard user agent (not the headless one)
+			chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"),
+
+			// Standard window size
+			chromedp.WindowSize(1440, 900),
+		}
 
 		if headless {
 			opts = append(opts, chromedp.Headless)
@@ -111,8 +126,35 @@ func main() {
 	browserCtx, browserCancel := chromedp.NewContext(bridge.allocCtx)
 	defer browserCancel()
 
-	// Navigate initial tab to about:blank to initialize
-	if err := chromedp.Run(browserCtx); err != nil {
+	// Initialize and inject stealth scripts
+	if err := chromedp.Run(browserCtx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			// Inject script to run on every new document (hides webdriver flag)
+			_, err := page.AddScriptToEvaluateOnNewDocument(`
+				// Hide webdriver
+				Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+				// Hide chrome.runtime (automation detection)
+				if (!window.chrome) { window.chrome = {}; }
+				if (!window.chrome.runtime) { window.chrome.runtime = {}; }
+				// Fix permissions
+				const originalQuery = window.navigator.permissions.query;
+				window.navigator.permissions.query = (parameters) => (
+					parameters.name === 'notifications' ?
+						Promise.resolve({ state: Notification.permission }) :
+						originalQuery(parameters)
+				);
+				// Hide plugins length
+				Object.defineProperty(navigator, 'plugins', {
+					get: () => [1, 2, 3, 4, 5],
+				});
+				// Hide languages
+				Object.defineProperty(navigator, 'languages', {
+					get: () => ['en-GB', 'en-US', 'en'],
+				});
+			`).Do(ctx)
+			return err
+		}),
+	); err != nil {
 		log.Fatalf("Cannot start Chrome: %v", err)
 	}
 	bridge.browserCtx = browserCtx
