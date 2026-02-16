@@ -18,11 +18,11 @@ BridgeAPI interface, handler tests, nil guard, deprecated flag removal.
 - [x] **Restore navigates all tabs at once** — Fixed: Added concurrency limiting (max 3 concurrent tab creations, max 2 concurrent navigations) 
 - [x] **Screenshot base64 returns raw bytes** — Fixed: Already working correctly, returns proper base64 string encoding in JSON
 
-## P6: Next Up
-- [ ] **Action chaining** — `POST /actions` batch multiple actions in one call (big token saver for agents)
-- [ ] **`/cookies` endpoint** — read/set cookies (auth debugging)
-- [ ] **LaunchAgent/systemd** — auto-start on boot
-- [ ] **Config file** — `~/.pinchtab/config.json` (alternative to env vars)
+## P6: Next Up — COMPLETE! ✅
+- [x] **Action chaining** — `POST /actions` batch multiple actions in one call (big token saver for agents)
+- [x] **`/cookies` endpoint** — read/set cookies (auth debugging)
+- [x] **LaunchAgent/systemd** — auto-start on boot
+- [x] **Config file** — `~/.pinchtab/config.json` (alternative to env vars)
 
 ## P7: Nice to Have
 - [ ] **File-based output** — `?output=file` saves snapshot to disk, returns path
