@@ -2,3 +2,13 @@ node_modules/
 browser-bridge
 pinchtab
 coverage.out
+
+# OpenClaw workspace files (should never be committed)
+.openclaw/
+SOUL.md
+HEARTBEAT.md
+IDENTITY.md
+USER.md
+BOOTSTRAP.md
+TOOLS.md
+MEMORY.md
