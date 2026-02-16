@@ -1,5 +1,8 @@
 # Pinchtab — TODO
 
+**Philosophy**: 12MB binary. HTTP API. Zero deps. Internal tool, not a product.
+If a feature needs a GUI, complex config, or "target users" — it's probably wrong.
+
 ## Completed (P0–P5)
 Safety, file split, Go idioms, testability, features — all done.
 38 tests passing, 0 lint issues. See git history for details.
@@ -67,17 +70,13 @@ BridgeAPI interface, handler tests, nil guard, deprecated flag removal.
 - [ ] **Non-default window sizes** — Randomize initial window dimensions to avoid common automation fingerprints
 - [ ] **Custom user data directory management** — Better session isolation and cleanup options
 
-## Future: Desktop App Restructure
-When a second binary (desktop app via Wails) is needed, restructure to:
-```
-cmd/pinchtab/main.go        # CLI binary
-cmd/pinchtab-app/main.go    # desktop binary
-internal/server/             # current Go files move here
-internal/config/
-app/                         # Wails desktop layer
-frontend/                    # dashboard HTML/JS
-```
-Until then, flat structure is correct. Don't premature-abstract.
+## Future: Maybe Never
+- Desktop app — Pinchtab is a 12MB HTTP server. Agents don't need GUIs.
+- Profile switching — Just use `pinchtab --profile=testing` or config file
+- Performance dashboard — `GET /monitor/performance` returns JSON. Done.
+- If humans need monitoring, serve a simple `/debug/` page, not a desktop app
+
+Keep it headless. Keep it simple. The HTTP API is the product.
 
 ## Not Doing
 - Plugin system
