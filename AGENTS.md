@@ -7,6 +7,9 @@ git config core.hooksPath .githooks   # one-time setup
 go build -o pinchtab .                # build
 go test ./... -count=1                # test
 golangci-lint run ./...               # lint (v2.9.0+)
+
+# Pre-push checks (matches CI exactly)
+./scripts/check.sh                    # run all CI checks locally
 ```
 
 ## Project Structure
@@ -44,9 +47,33 @@ Single Go package (`main`), no subdirectories. ~1100 lines across 13 files:
 ### Git
 - Branch: **`main`** only
 - Always **rebase before push**: `git pull --rebase && git push`
+- **ALWAYS run pre-push checks**: `./scripts/check.sh` before committing
 - Pre-commit hook runs: `gofmt` check → `go vet` → `go test`
 - If push is rejected, rebase — never force push unless you know why
 - Commit messages: imperative, lowercase, concise. `fix lint: unchecked error return`
+
+### Pre-Push Workflow
+```bash
+# 1. Make your changes
+vim some_file.go
+
+# 2. Run comprehensive checks (matches CI exactly)
+./scripts/check.sh
+
+# 3. If checks pass, commit and push
+git add -A
+git commit -m "your changes"
+git push
+```
+
+**The check script runs:**
+- Format check (`gofmt -l .`)
+- Go vet (`go vet ./...`)
+- Build test (`go build`)  
+- All tests with coverage
+- Lint (if golangci-lint installed)
+
+This prevents CI failures and ensures code quality.
 
 ### CI
 CI runs on every push to `main`:
