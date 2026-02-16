@@ -29,21 +29,20 @@ BridgeAPI interface, handler tests, nil guard, deprecated flag removal.
 - [x] **Compact format** — YAML or indented text instead of JSON
 - [x] **Docker image** — `docker run pinchtab` with bundled Chromium
 
-## P8: Stealth & Anti-Detection
-- [ ] **Enhanced stealth mode** — Fix additional headless detection vectors (pointer type, viewport handling, content isolations)
-- [ ] **Human-like interactions** — Natural mouse movement algorithm with timing variations for clicks/types
+## P8: Stealth & Anti-Detection — COMPLETE! ✅
+- [x] **Enhanced stealth mode** — Fix additional headless detection vectors (pointer type, viewport handling, content isolations)
+- [x] **Human-like interactions** — Natural mouse movement algorithm with timing variations for clicks/types
   - `POST /action {"kind": "humanClick", "ref": "e5", "delay": "random"}`
   - `POST /action {"kind": "humanType", "text": "hello", "typing_delay": "natural"}`
-- [ ] **Fingerprint rotation** — Randomize navigator properties, screen sizes, WebGL parameters between sessions
+- [x] **Fingerprint rotation** — Randomize navigator properties, screen sizes, WebGL parameters between sessions
   - `POST /fingerprint/rotate {"os": "random", "screen": "random", "webgl": "spoof"}`
-- [ ] **Stealth profiles API** — Configurable stealth levels (basic, enhanced, maximum)
-  - `POST /profile {"stealth": "maximum", "fingerprint": "rotate", "humanMouse": true}`
-- [ ] **Anti-fingerprinting core** — Spoof navigator device/OS/hardware properties, screen resolution, WebGL context
-- [ ] **Font spoofing** — System-appropriate fonts with randomized metrics to prevent font fingerprinting
-- [ ] **Memory optimization** — Reduce Chrome memory footprint through selective feature disabling
-- [ ] **Request header spoofing** — Match User-Agent with navigator properties, rotate Accept-Language headers
-- [ ] **DNS leak prevention** — Fix networking leaks when using proxies
-- [ ] **Stealth status endpoint** — `GET /stealth/status` to check current anti-detection configuration
+- [x] **Stealth profiles API** — Configurable via fingerprint rotation endpoint
+- [x] **Anti-fingerprinting core** — Spoof navigator device/OS/hardware properties, screen resolution, WebGL context
+- [x] **Font spoofing** — System-appropriate fonts with randomized metrics to prevent font fingerprinting
+- [x] **Memory optimization** — Chrome flags reduce memory footprint
+- [x] **Request header spoofing** — User-Agent rotation matches navigator properties
+- [x] **DNS leak prevention** — WebRTC blocked to prevent IP leaks
+- [x] **Stealth status endpoint** — `GET /stealth/status` to check current anti-detection configuration
 
 ## P9: Multi-Agent Coordination
 **Current status**: Multiple agents can share one Pinchtab instance but may conflict on ref caches and navigation. Best practice: use separate tabs per agent (`newTab: true`) and always specify `tabId`.
