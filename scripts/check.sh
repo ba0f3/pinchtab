@@ -63,14 +63,24 @@ success_step "Tests with Coverage"
 
 # Step 5: Lint check (if golangci-lint is available)
 check_step "Lint Check"
+# Check common locations for golangci-lint
+LINT_CMD=""
 if command -v golangci-lint >/dev/null 2>&1; then
-    if ! golangci-lint run ./...; then
+    LINT_CMD="golangci-lint"
+elif [ -x "$HOME/bin/golangci-lint" ]; then
+    LINT_CMD="$HOME/bin/golangci-lint"
+elif [ -x "/usr/local/bin/golangci-lint" ]; then
+    LINT_CMD="/usr/local/bin/golangci-lint"
+fi
+
+if [ -n "$LINT_CMD" ]; then
+    if ! $LINT_CMD run ./...; then
         error_step "Lint Check"
     fi
     success_step "Lint Check"
 else
     echo -e "${YELLOW}⚠️  golangci-lint not installed - skipping lint check${NC}"
-    echo -e "${YELLOW}   Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest${NC}"
+    echo -e "${YELLOW}   Install with: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ~/bin v2.9.0${NC}"
 fi
 
 # Step 6: Clean up
