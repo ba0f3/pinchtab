@@ -1,6 +1,14 @@
 // Enhanced stealth script injected into every new document via page.AddScriptToEvaluateOnNewDocument.
 // Hides automation indicators from sophisticated bot detection systems like X.com.
 
+// Hardware values - seeded and consistent per session
+// MUST BE DEFINED FIRST before any usage
+const sessionSeed = Date.now() % 1000000;
+const seededRandom = (seed) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
 // Hide webdriver flag completely
 Object.defineProperty(navigator, 'webdriver', { 
   get: () => undefined,
@@ -185,13 +193,7 @@ Object.defineProperty(Date.prototype, 'getTimezoneOffset', {
   }
 });
 
-// Hardware values - seeded and consistent per session
-const sessionSeed = Date.now() % 1000000;
-const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-};
-
+// Use the already-defined sessionSeed and seededRandom from top of file
 const hardwareCore = 2 + Math.floor(seededRandom(sessionSeed) * 6) * 2; // 2,4,6,8,10,12
 const deviceMem = [2, 4, 8, 16][Math.floor(seededRandom(sessionSeed * 2) * 4)];
 

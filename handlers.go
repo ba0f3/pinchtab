@@ -1133,24 +1133,24 @@ func (b *Bridge) handleFingerprintRotate(w http.ResponseWriter, r *http.Request)
   Object.defineProperty(navigator, 'vendor', {
     get: () => %q
   });
-  
+
   // Screen resolution
   Object.defineProperty(screen, 'width', { get: () => %d });
   Object.defineProperty(screen, 'height', { get: () => %d });
   Object.defineProperty(screen, 'availWidth', { get: () => %d });
   Object.defineProperty(screen, 'availHeight', { get: () => %d });
-  
+
   // Language
   Object.defineProperty(navigator, 'language', { get: () => %q });
   Object.defineProperty(navigator, 'languages', { get: () => [%q] });
-  
+
   // Timezone
   Date.prototype.getTimezoneOffset = function() { return %d; };
-  
+
   // Hardware
   Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => %d });
   Object.defineProperty(navigator, 'deviceMemory', { get: () => %d });
-  
+
   console.log('Fingerprint rotated successfully');
 })();
 	`, fp.UserAgent, fp.Platform, fp.Vendor,
@@ -1164,7 +1164,7 @@ func (b *Bridge) handleFingerprintRotate(w http.ResponseWriter, r *http.Request)
 	// Use CDP to inject script that persists across navigations
 	if err := chromedp.Run(tCtx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			// Set timezone via CDP
+			// Set timezone via script (CDP emulation not available in current chromedp)
 			if req.Timezone != 0 {
 				script = fmt.Sprintf("window.__pinchtab_timezone = %d;", req.Timezone) + script
 			}
