@@ -200,9 +200,10 @@ if (window.RTCPeerConnection) {
 }
 
 // Timezone spoofing - configurable via window.__pinchtab_timezone
+const __pinchtab_origGetTimezoneOffset = Date.prototype.getTimezoneOffset;
 Object.defineProperty(Date.prototype, 'getTimezoneOffset', {
   value: function() { 
-    return window.__pinchtab_timezone || new Date().getTimezoneOffset();
+    return window.__pinchtab_timezone || __pinchtab_origGetTimezoneOffset.call(this);
   }
 });
 
