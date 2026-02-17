@@ -24,10 +24,10 @@ K1-K9 all fixed, multi-agent concurrency verified (MA1-MA8).
 - [x] **K10 — Profile hang** — Fixed: lock file cleanup, unclean exit detection, 15s Chrome timeout, auto-retry with session clear.
 - [ ] **Coverage to 30%** — Add tests for cookie/stealth handler happy paths (~2% gap).
 
-### P1: Token Optimization
-- [ ] **`maxTokens` param on `/snapshot`** — Truncate response at N tokens. Wikipedia at 142K is unusable without this.
-- [ ] **`selector` param on `/snapshot`** — Scope a11y tree to CSS selector (`#content`, `article`). Eliminates nav/footer noise.
-- [ ] **Compact snapshot format** — Current nodes are verbose JSON objects. A flat format could halve tokens. Close the 3-4× gap with OpenClaw aria trees.
+### ~~P1: Token Optimization~~ — DONE
+- [x] **`maxTokens` param on `/snapshot`** — Truncates to ~N tokens, returns `truncated: true` flag. Wikipedia 142K → 1.4K with maxTokens=2000.
+- [x] **`selector` param on `/snapshot`** — Scopes a11y tree to CSS selector subtree (e.g. `?selector=main`, `?selector=%23content`).
+- [x] **`format=compact`** — One-line-per-node format: 56-64% fewer tokens than JSON. All three compose: `?selector=main&maxTokens=2000&format=compact`.
 
 ### ~~P2: Bugs~~ — DONE
 - [x] **K11 — File output ignores path** — Fixed: `?output=file&path=X` now honors custom path, auto-creates parent dirs.
