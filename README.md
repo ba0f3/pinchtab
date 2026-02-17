@@ -90,6 +90,7 @@ Pinchtab launches its own Chrome with a persistent profile at `~/.pinchtab/chrom
 - 🖱️ **Direct actions** — click, type, fill, press, focus, hover, select, scroll by ref or CSS selector
 - 🕵️ **Stealth mode** — patches `navigator.webdriver`, spoofs UA, hides automation flags
 - 💾 **Session persistence** — cookies, auth, tabs survive restarts
+- 🚫 **Image blocking** — skip image downloads for faster, leaner browsing (`BRIDGE_BLOCK_IMAGES` or per-request)
 - 📝 **Text extraction** — readability mode (strips nav/ads) or raw `innerText`
 - 🔄 **Smart diff** — `?diff=true` returns only changes since last snapshot
 - 📄 **Text format** — `?format=text` for indented tree (~40-60% fewer tokens than JSON)
@@ -138,6 +139,11 @@ All via environment variables:
 | `BRIDGE_STATE_DIR` | `~/.pinchtab` | State/session storage |
 | `BRIDGE_NO_RESTORE` | `false` | Skip restoring tabs from previous session |
 | `BRIDGE_CHROME_VERSION` | `133.0.6943.98` | Chrome version in User-Agent strings (keep current to avoid detection) |
+| `BRIDGE_BLOCK_IMAGES` | `false` | Block image loading (faster, lower bandwidth) |
+| `BRIDGE_TIMEOUT` | `15` | Action timeout (seconds) |
+| `BRIDGE_NAV_TIMEOUT` | `30` | Navigation timeout (seconds) |
+| `BRIDGE_CHROME_VERSION` | `133.0.6943.98` | Chrome UA version string |
+| `BRIDGE_CONFIG` | `~/.pinchtab/config.json` | Path to config JSON file |
 | `CDP_URL` | *(none)* | Connect to existing Chrome instead of launching |
 
 ## Architecture

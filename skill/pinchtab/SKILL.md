@@ -36,6 +36,9 @@ metadata:
         - name: BRIDGE_CHROME_VERSION
           optional: true
           description: "Chrome UA version string (default: 133.0.6943.98)"
+        - name: BRIDGE_BLOCK_IMAGES
+          optional: true
+          description: "Block image loading for faster, lower-bandwidth browsing (true/false)"
         - name: BRIDGE_CONFIG
           optional: true
           description: "Path to config JSON file (default: ~/.pinchtab/config.json)"
@@ -90,6 +93,11 @@ Refs (e.g. `e0`, `e5`, `e12`) are cached per tab after each snapshot — no need
 curl -X POST http://localhost:9867/navigate \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://example.com"}'
+
+# With options: custom timeout, block images, open in new tab
+curl -X POST http://localhost:9867/navigate \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://example.com", "timeout": 60, "blockImages": true, "newTab": true}'
 ```
 
 ### Snapshot (accessibility tree)
@@ -291,6 +299,7 @@ curl http://localhost:9867/health
 | `BRIDGE_STATE_DIR` | `~/.pinchtab` | State/session storage |
 | `BRIDGE_NO_RESTORE` | `false` | Skip tab restore on startup |
 | `BRIDGE_CHROME_VERSION` | `133.0.6943.98` | Chrome UA version string |
+| `BRIDGE_BLOCK_IMAGES` | `false` | Block image loading (faster, lower bandwidth) |
 | `BRIDGE_CONFIG` | `~/.pinchtab/config.json` | Path to config JSON file |
 | `BRIDGE_TIMEOUT` | `15` | Action timeout (seconds) |
 | `BRIDGE_NAV_TIMEOUT` | `30` | Navigation timeout (seconds) |
@@ -305,3 +314,4 @@ curl http://localhost:9867/health
 - Pinchtab persists sessions — tabs survive restarts (disable with `BRIDGE_NO_RESTORE=true`)
 - Chrome profile is persistent — cookies/logins carry over between runs
 - Use `BRIDGE_CHROME_VERSION` to match your installed Chrome version for stealth consistency
+- Use `BRIDGE_BLOCK_IMAGES=true` or `"blockImages": true` on navigate for read-heavy tasks — reduces bandwidth and memory
