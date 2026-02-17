@@ -176,11 +176,12 @@ func (b *Bridge) handleText(w http.ResponseWriter, r *http.Request) {
 
 func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TabID     string  `json:"tabId"`
-		URL       string  `json:"url"`
-		NewTab    bool    `json:"newTab"`
-		WaitTitle float64 `json:"waitTitle"` // seconds to wait for title (default 2, max 30)
-		Timeout   float64 `json:"timeout"`   // per-request navigate timeout in seconds (default: BRIDGE_NAV_TIMEOUT)
+		TabID       string  `json:"tabId"`
+		URL         string  `json:"url"`
+		NewTab      bool    `json:"newTab"`
+		WaitTitle   float64 `json:"waitTitle"`   // seconds to wait for title (default 2, max 30)
+		Timeout     float64 `json:"timeout"`     // per-request navigate timeout in seconds (default: BRIDGE_NAV_TIMEOUT)
+		BlockImages *bool   `json:"blockImages"` // per-request override; nil = use global BRIDGE_BLOCK_IMAGES
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize)).Decode(&req); err != nil {
 		jsonErr(w, 400, fmt.Errorf("decode: %w", err))
@@ -209,6 +210,12 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		navTimeout = time.Duration(req.Timeout * float64(time.Second))
 	}
 
+	// Resolve image blocking: per-request overrides global.
+	shouldBlockImages := blockImages
+	if req.BlockImages != nil {
+		shouldBlockImages = *req.BlockImages
+	}
+
 	if req.NewTab {
 		newTargetID, newCtx, _, err := b.CreateTab(req.URL)
 		if err != nil {
@@ -219,6 +226,10 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		tCtx, tCancel := context.WithTimeout(newCtx, navTimeout)
 		defer tCancel()
 		go cancelOnClientDone(r.Context(), tCancel)
+
+		if shouldBlockImages {
+			_ = setImageBlocking(tCtx, true)
+		}
 
 		var url, title string
 		_ = chromedp.Run(tCtx, chromedp.Location(&url))
@@ -237,6 +248,9 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	tCtx, tCancel := context.WithTimeout(ctx, navTimeout)
 	defer tCancel()
 	go cancelOnClientDone(r.Context(), tCancel)
+
+	// Apply image blocking before navigation.
+	_ = setImageBlocking(tCtx, shouldBlockImages)
 
 	if err := navigatePage(tCtx, req.URL); err != nil {
 		jsonErr(w, 500, fmt.Errorf("navigate: %w", err))

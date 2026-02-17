@@ -168,6 +168,30 @@ func scrollByNodeID(ctx context.Context, backendNodeID int64) error {
 	return withElement(ctx, backendNodeID, "function() { this.scrollIntoViewIfNeeded(); }")
 }
 
+// setImageBlocking uses Network.setBlockedURLs to block common image URLs.
+// Pass true to block, false to clear the blocklist.
+func setImageBlocking(ctx context.Context, block bool) error {
+	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		// Enable Network domain first (idempotent).
+		if err := chromedp.FromContext(ctx).Target.Execute(ctx, "Network.enable", nil, nil); err != nil {
+			return fmt.Errorf("Network.enable: %w", err)
+		}
+
+		var urls []string
+		if block {
+			urls = []string{
+				"*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.svg", "*.ico",
+				"*.bmp", "*.tiff", "*.avif",
+			}
+		}
+		p := map[string]any{"urls": urls}
+		if err := chromedp.FromContext(ctx).Target.Execute(ctx, "Network.setBlockedURLs", p, nil); err != nil {
+			return fmt.Errorf("Network.setBlockedURLs: %w", err)
+		}
+		return nil
+	}))
+}
+
 // resolveNodeToObject converts a backendNodeID to a JS remote object ID.
 func resolveNodeToObject(ctx context.Context, backendNodeID int64) (string, error) {
 	p := map[string]any{"backendNodeId": backendNodeID}
