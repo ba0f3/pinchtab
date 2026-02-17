@@ -22,9 +22,9 @@ now consumed by Go). **92 unit tests + ~100 integration, 28.9% coverage.**
 P0 (K10 profile hang), P1 (token optimization: maxTokens/selector/compact),
 P2 (K11 file path, blockImages on CreateTab) — all resolved.
 
-### P3: Multi-Agent
-- [ ] **Tab locking** — `POST /tab/lock`, `POST /tab/unlock` with timeout-based deadlock prevention.
-- [ ] **Tab ownership tracking** — Show owner in `/tabs` response.
+### ~~P3: Multi-Agent~~ — DONE
+- [x] **Tab locking** — `POST /tab/lock`, `POST /tab/unlock` with timeout-based deadlock prevention (default 30s, max 5min). Same owner can re-lock (extend). 409 on conflict.
+- [x] **Tab ownership tracking** — `/tabs` shows `owner` and `lockedUntil` on locked tabs.
 
 ### P4: Quality of Life
 - [ ] **Headed mode testing** — Run Section 2 tests to validate non-headless.

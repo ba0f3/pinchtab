@@ -35,6 +35,7 @@ type Bridge struct {
 	tabs          map[string]*TabEntry
 	snapshots     map[string]*refCache
 	stealthScript string // injected on every new tab
+	locks         *lockManager
 	mu            sync.RWMutex
 }
 

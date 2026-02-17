@@ -222,6 +222,7 @@ func main() {
 	bridge.browserCtx = browserCtx
 	bridge.tabs = make(map[string]*TabEntry)
 	bridge.snapshots = make(map[string]*refCache)
+	bridge.locks = newLockManager()
 
 	// Register the initial tab
 	initTargetID := chromedp.FromContext(browserCtx).Target.TargetID
@@ -250,6 +251,8 @@ func main() {
 	mux.HandleFunc("POST /actions", bridge.handleActions)
 	mux.HandleFunc("POST /evaluate", bridge.handleEvaluate)
 	mux.HandleFunc("POST /tab", bridge.handleTab)
+	mux.HandleFunc("POST /tab/lock", bridge.handleTabLock)
+	mux.HandleFunc("POST /tab/unlock", bridge.handleTabUnlock)
 	mux.HandleFunc("GET /cookies", bridge.handleGetCookies)
 	mux.HandleFunc("POST /cookies", bridge.handleSetCookies)
 	mux.HandleFunc("GET /stealth/status", bridge.handleStealthStatus)
