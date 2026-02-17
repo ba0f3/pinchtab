@@ -56,7 +56,7 @@ var (
 	headless         = os.Getenv("BRIDGE_HEADLESS") == "true"
 	noRestore        = os.Getenv("BRIDGE_NO_RESTORE") == "true"
 	profileDir       = envOr("BRIDGE_PROFILE", filepath.Join(homeDir(), ".pinchtab", "chrome-profile"))
-	chromeVersion    = envOr("BRIDGE_CHROME_VERSION", "133.0.6943.98")
+	chromeVersion    = envOr("BRIDGE_CHROME_VERSION", "144.0.7559.133")
 	timezone         = os.Getenv("BRIDGE_TIMEZONE") // e.g. "America/New_York"
 	blockImages      = os.Getenv("BRIDGE_BLOCK_IMAGES") == "true"
 	blockMedia       = os.Getenv("BRIDGE_BLOCK_MEDIA") == "true" // superset: images + fonts + CSS + video

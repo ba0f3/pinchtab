@@ -110,8 +110,7 @@ func main() {
 			// Random seed for consistent behavior across runs
 			chromedp.Flag("js-flags", "--random-seed=1157259157"),
 
-			// Identity
-			chromedp.UserAgent(fmt.Sprintf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Safari/537.36", chromeVersion)),
+			// Window size (UA left as Chrome default to avoid detection mismatches)
 			chromedp.WindowSize(1366, 768),
 		}
 
