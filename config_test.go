@@ -104,6 +104,24 @@ func TestLoadConfig_EnvOverridesFile(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	configPath := dir + "/config.json"
+	os.WriteFile(configPath, []byte("{broken json!!!"), 0644)
+
+	// Save and restore global state
+	origPort := port
+	defer func() { port = origPort }()
+
+	t.Setenv("BRIDGE_CONFIG", configPath)
+	t.Setenv("BRIDGE_PORT", "")
+	port = "9867"
+	loadConfig() // should not panic, should keep defaults
+	if port != "9867" {
+		t.Errorf("invalid config should not change port, got %q", port)
+	}
+}
+
 func TestConstants(t *testing.T) {
 	// Verify constants are what handlers expect
 	if actionClick != "click" {

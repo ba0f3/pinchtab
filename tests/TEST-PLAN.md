@@ -254,8 +254,8 @@ Track these separately — they are known bugs, not test failures.
 | # | Issue | Severity | Status | Notes |
 |---|-------|----------|--------|-------|
 | K1 | Active tab tracking unreliable after navigate | 🔴 P0 | ✅ FIXED | Confirmed working in autorun hour 00. |
-| K2 | Tab close hangs | 🟡 P1 | 🔧 FIX APPLIED | Hour 01 fix (close via existing context). Needs re-verification. |
-| K3 | x.com title always empty | 🟢 P2 | OPEN | SPA hydration too slow for navigate timeout. |
+| K2 | Tab close hangs | 🟡 P1 | ✅ FIXED | Hour 07: switched to `target.CloseTarget` (browser-level CDP). No more hangs. |
+| K3 | x.com title always empty | 🟢 P2 | 🔧 IMPROVED | Hour 03: added `waitTitle` param to navigate. Agents can wait for SPA titles. |
 | K4 | Chrome flag warning banner | 🟢 P2 | ✅ FIXED | Removed deprecated flag (hour 05); CDP stealth handles it. |
 | K5 | Stealth PRNG weak (8F-2) | 🟡 P1 | ✅ FIXED | Now uses Mulberry32 with Go-injected seed. |
 | K6 | Chrome UA hardcoded to 131 (8F-6) | 🟡 P1 | ✅ FIXED | Configurable via `BRIDGE_CHROME_VERSION`, default 133. |

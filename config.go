@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -93,7 +94,9 @@ func loadConfig() {
 	// Try to load config file
 	if data, err := os.ReadFile(configPath); err == nil {
 		var cfg Config
-		if err := json.Unmarshal(data, &cfg); err == nil {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			slog.Warn("invalid JSON in config file, ignoring", "path", configPath, "err", err)
+		} else {
 			// Apply config file values (env vars take precedence)
 			if cfg.Port != "" && os.Getenv("BRIDGE_PORT") == "" {
 				port = cfg.Port

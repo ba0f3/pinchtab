@@ -82,6 +82,12 @@ Key observations:
 | K5-K9 | Stealth issues | — | ✅ ALL FIXED | Mario's fixes (CDP overrides) |
 | NEW | Profile dir hang | 🟡 P1 | OPEN | Default profile can hang Chrome launch. Fresh profiles work. |
 
+## Fixes Applied This Run (Hour 07, second pass)
+
+**Invalid config JSON warning:** `loadConfig()` previously silently ignored malformed `config.json` files. Now logs a `slog.Warn` with the path and parse error. Added `TestLoadConfig_InvalidJSON` unit test. Total: 79 tests passing.
+
+**TEST-PLAN.md updated:** K2 status → ✅ FIXED, K3 status → 🔧 IMPROVED (were stale).
+
 ## Fixes Applied This Run (Hour 07)
 
 **K2 — Tab close hangs:** Root cause was `page.Close()` requiring an active page context. If the tab was unresponsive or the context was stale, `chromedp.Run` would hang indefinitely. Fix: replaced with `target.CloseTarget` (CDP-level command via browser context) wrapped in a 5-second timeout. This operates at the browser level rather than the page level, so it works even when the tab is frozen. Also removed unused `page` import from bridge.go.
@@ -89,7 +95,7 @@ Key observations:
 ## Release Readiness (v1.0)
 
 **P0 blockers:** K1 ✅, K2 ✅, zero crashes ✅
-**Unit tests:** All pass ✅
+**Unit tests:** 79 pass ✅
 **Integration tests:** 6 pass, 1 skip (headless), 1 skip (headed-only) ✅
 
 Remaining: expand autorun coverage to sections 1.7+, investigate profile hang (P1), verify K2 fix in next even-hour run.
