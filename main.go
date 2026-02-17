@@ -306,7 +306,7 @@ func main() {
 		doShutdown()
 	}()
 
-	slog.Info("🦀 PINCH! PINCH!", "port", port, "cdp", cdpURL)
+	slog.Info("🦀 PINCH! PINCH!", "port", port, "cdp", cdpURL, "stealth", stealthLevel)
 	if token != "" {
 		slog.Info("auth enabled")
 	} else {
