@@ -331,9 +331,9 @@ Pinchtab is built to work seamlessly with [OpenClaw](https://openclaw.ai) — th
 
 <a href="https://star-history.com/#pinchtab/pinchtab&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date&theme=dark&v=20260217" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date&v=20260217" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date&v=20260217" />
  </picture>
 </a>
 
