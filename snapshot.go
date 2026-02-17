@@ -179,6 +179,111 @@ func formatSnapshotText(nodes []A11yNode) string {
 	return b.String()
 }
 
+// formatSnapshotCompact renders nodes in a minimal one-line-per-node format.
+// ~60-70% fewer tokens than JSON. Format: ref:role "name" [val="v"] [flags]
+func formatSnapshotCompact(nodes []A11yNode) string {
+	var b strings.Builder
+	for _, n := range nodes {
+		b.WriteString(n.Ref)
+		b.WriteByte(':')
+		b.WriteString(n.Role)
+		if n.Name != "" {
+			b.WriteString(` "`)
+			b.WriteString(n.Name)
+			b.WriteByte('"')
+		}
+		if n.Value != "" {
+			b.WriteString(` val="`)
+			b.WriteString(n.Value)
+			b.WriteByte('"')
+		}
+		if n.Focused {
+			b.WriteString(" *")
+		}
+		if n.Disabled {
+			b.WriteString(" -")
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// truncateToTokens trims nodes to stay under a rough token budget.
+// Returns the truncated slice and whether truncation occurred.
+// Token estimate: compact/text ~= len/4, json ~= len/3.
+func truncateToTokens(nodes []A11yNode, maxTokens int, format string) ([]A11yNode, bool) {
+	tokensUsed := 0
+	for i, n := range nodes {
+		// Estimate tokens for this node based on format
+		var nodeTokens int
+		switch format {
+		case "compact":
+			// ref:role "name" ≈ compact
+			size := len(n.Ref) + 1 + len(n.Role) + len(n.Name) + len(n.Value) + 8
+			nodeTokens = size / 4
+		case "text":
+			size := n.Depth*2 + len(n.Ref) + 1 + len(n.Role) + len(n.Name) + len(n.Value) + 8
+			nodeTokens = size / 4
+		default:
+			// JSON is more verbose
+			size := len(n.Ref) + len(n.Role) + len(n.Name) + len(n.Value) + 60
+			nodeTokens = size / 3
+		}
+		if nodeTokens < 1 {
+			nodeTokens = 1
+		}
+		tokensUsed += nodeTokens
+		if tokensUsed > maxTokens {
+			return nodes[:i], true
+		}
+	}
+	return nodes, false
+}
+
+// filterSubtree returns only nodes that are descendants of the node with
+// the given backendDOMNodeID. Uses the a11y tree's childIds to walk the subtree.
+func filterSubtree(nodes []rawAXNode, scopeBackendID int64) []rawAXNode {
+	// Find the a11y node whose backendDOMNodeId matches
+	scopeAXID := ""
+	for _, n := range nodes {
+		if n.BackendDOMNodeID == scopeBackendID {
+			scopeAXID = n.NodeID
+			break
+		}
+	}
+	if scopeAXID == "" {
+		return nodes // scope not found, return all
+	}
+
+	// BFS to find all descendant node IDs
+	childMap := make(map[string][]string, len(nodes))
+	for _, n := range nodes {
+		childMap[n.NodeID] = append(childMap[n.NodeID], n.ChildIDs...)
+	}
+
+	include := make(map[string]bool)
+	include[scopeAXID] = true
+	queue := []string{scopeAXID}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, cid := range childMap[cur] {
+			if !include[cid] {
+				include[cid] = true
+				queue = append(queue, cid)
+			}
+		}
+	}
+
+	result := make([]rawAXNode, 0, len(include))
+	for _, n := range nodes {
+		if include[n.NodeID] {
+			result = append(result, n)
+		}
+	}
+	return result
+}
+
 // diffSnapshot returns only nodes that changed between prev and current snapshots.
 // A node is "changed" if it's new, removed, or has different name/value/focused/disabled.
 // Returns added, changed, and removed nodes.

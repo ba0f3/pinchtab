@@ -296,7 +296,7 @@ func main() {
 			)
 			return
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			slog.Info("startup health check passed")
 		} else {
