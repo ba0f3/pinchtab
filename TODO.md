@@ -45,6 +45,16 @@ P2 (K11 file path, blockImages on CreateTab) — all resolved.
 
 ---
 
+## Known Bugs
+
+- **Batch empty array** — `POST /actions []` returns generic decode error instead of "empty batch" message.
+- **`hardwareConcurrency` redefine warning** — Console warning during fingerprint rotation (cosmetic).
+- **Canvas noise in headless** — `toDataURL()` returns identical data in headless Chrome. Only affects `full` stealth mode.
+- **No tab limit** — Can open unlimited tabs with no cap enforced.
+- **Headed mode** — Experimental, not fully tested. Profile management is manual and cumbersome.
+
+---
+
 ## Not Doing
 Desktop app, plugin system, proxy rotation, SaaS, Selenium compat, MCP protocol,
 cloud anything, distributed clusters, workflow orchestration.
