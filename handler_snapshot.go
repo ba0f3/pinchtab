@@ -20,10 +20,10 @@ func (b *Bridge) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	tabID := r.URL.Query().Get("tabId")
 	filter := r.URL.Query().Get("filter")
 	doDiff := r.URL.Query().Get("diff") == "true"
-	format := r.URL.Query().Get("format")      // "text", "yaml", "compact"
-	output := r.URL.Query().Get("output")       // "file" to save to disk
-	outputPath := r.URL.Query().Get("path")     // custom file path for output=file
-	selector := r.URL.Query().Get("selector")   // CSS selector to scope snapshot
+	format := r.URL.Query().Get("format")          // "text", "yaml", "compact"
+	output := r.URL.Query().Get("output")          // "file" to save to disk
+	outputPath := r.URL.Query().Get("path")        // custom file path for output=file
+	selector := r.URL.Query().Get("selector")      // CSS selector to scope snapshot
 	maxTokensStr := r.URL.Query().Get("maxTokens") // truncate output to ~N tokens
 	maxDepthStr := r.URL.Query().Get("depth")
 	maxDepth := -1
