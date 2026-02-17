@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	cdp "github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 )
@@ -168,40 +169,32 @@ func (b *Bridge) CreateTab(url string) (string, context.Context, context.CancelF
 // CloseTab closes a tab by ID and cleans up caches.
 func (b *Bridge) CloseTab(tabID string) error {
 	b.mu.Lock()
-	_, ok := b.tabs[tabID]
+	entry, tracked := b.tabs[tabID]
 	b.mu.Unlock()
 
-	// Use target.CloseTarget via the browser context — this is more reliable
-	// than page.Close() which requires an active page context and can hang
-	// if the tab is unresponsive or the context is stale.
+	// Cancel the tab's chromedp context — this is the idiomatic way to close
+	// a tab in chromedp. It detaches from the target and lets Chrome clean up.
+	if tracked && entry.cancel != nil {
+		entry.cancel()
+	}
+
+	// Also send target.CloseTarget via the browser context for a clean CDP close.
 	closeCtx, closeCancel := context.WithTimeout(b.browserCtx, 5*time.Second)
 	defer closeCancel()
 
-	err := chromedp.Run(closeCtx,
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			if err := target.CloseTarget(target.ID(tabID)).Do(ctx); err != nil {
-				return fmt.Errorf("close tab: %w", err)
-			}
-			return nil
-		}),
-	)
-	if err != nil {
-		// If target wasn't tracked locally, it may already be gone — don't error.
-		if !ok {
+	// Use the CDP executor directly (not chromedp.Run) to avoid context issues.
+	if err := target.CloseTarget(target.ID(tabID)).Do(cdp.WithExecutor(closeCtx, chromedp.FromContext(closeCtx).Browser)); err != nil {
+		// Target may already be gone after cancel — that's fine.
+		if !tracked {
 			return nil
 		}
-		return fmt.Errorf("close tab: %w", err)
+		slog.Debug("close target CDP", "tabId", tabID, "err", err)
 	}
 
-	// Clean up local state after successful close.
+	// Clean up local state.
 	b.mu.Lock()
-	if entry, ok := b.tabs[tabID]; ok {
-		if entry.cancel != nil {
-			entry.cancel()
-		}
-		delete(b.tabs, tabID)
-		delete(b.snapshots, tabID)
-	}
+	delete(b.tabs, tabID)
+	delete(b.snapshots, tabID)
 	b.mu.Unlock()
 
 	return nil

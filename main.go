@@ -112,10 +112,12 @@ func main() {
 		markCleanExit()
 		bridge.allocCtx, allocCancel = chromedp.NewExecAllocator(context.Background(), opts...)
 	}
-	// allocCancel and browserCancel are called explicitly during shutdown
-	// (both signal and /shutdown endpoint) — not deferred here.
+	// Safety net: defers ensure Chrome cleanup even if doShutdown doesn't fire.
+	// doShutdown also calls these (sync.Once ensures no double-close issue).
+	defer allocCancel()
 
 	browserCtx, browserCancel := chromedp.NewContext(bridge.allocCtx)
+	defer browserCancel()
 
 	// Inject stealth script with a session-stable seed (stays constant across page loads)
 	stealthSeed := rand.Intn(1000000000)
