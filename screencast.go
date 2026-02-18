@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -36,9 +37,16 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	b.mu.RLock()
 	tab, ok := b.tabs[tabID]
 	b.mu.RUnlock()
+
+	// If tab isn't tracked (e.g. manually opened in headed mode), create a context for it
 	if !ok {
-		http.Error(w, "tab not found", 404)
-		return
+		tabCtx, _ := chromedp.NewContext(b.browserCtx, chromedp.WithTargetID(target.ID(tabID)))
+		// Quick ping to verify the target exists
+		if err := chromedp.Run(tabCtx); err != nil {
+			http.Error(w, "tab not found", 404)
+			return
+		}
+		tab = &TabEntry{ctx: tabCtx}
 	}
 
 	quality := queryParamInt(r, "quality", 40)
@@ -149,24 +157,43 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleScreencastAll returns info for building a multi-tab screencast view.
+// Uses CDP target discovery to find ALL tabs, not just ones in bridge.tabs.
 func (b *Bridge) handleScreencastAll(w http.ResponseWriter, r *http.Request) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
 	type tabInfo struct {
 		ID  string `json:"id"`
 		URL string `json:"url,omitempty"`
+		Title string `json:"title,omitempty"`
 	}
 
-	tabs := make([]tabInfo, 0, len(b.tabs))
-	for id, tab := range b.tabs {
-		url := ""
-		if tab.ctx != nil {
-			var loc string
-			_ = chromedp.Run(tab.ctx, chromedp.Location(&loc))
-			url = loc
+	ctx := b.browserCtx
+	if ctx == nil {
+		jsonResp(w, 200, []tabInfo{})
+		return
+	}
+
+	targets, err := target.GetTargets().Do(ctx)
+	if err != nil {
+		// Fallback to bridge.tabs
+		b.mu.RLock()
+		defer b.mu.RUnlock()
+		tabs := make([]tabInfo, 0, len(b.tabs))
+		for id := range b.tabs {
+			tabs = append(tabs, tabInfo{ID: id})
 		}
-		tabs = append(tabs, tabInfo{ID: id, URL: url})
+		jsonResp(w, 200, tabs)
+		return
+	}
+
+	tabs := make([]tabInfo, 0)
+	for _, t := range targets {
+		if t.Type != "page" {
+			continue
+		}
+		tabs = append(tabs, tabInfo{
+			ID:    string(t.TargetID),
+			URL:   t.URL,
+			Title: t.Title,
+		})
 	}
 
 	jsonResp(w, 200, tabs)
