@@ -49,9 +49,14 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 		tab = &TabEntry{ctx: tabCtx}
 	}
 
-	quality := queryParamInt(r, "quality", 40)
+	quality := queryParamInt(r, "quality", 30)
 	maxWidth := queryParamInt(r, "maxWidth", 800)
-	everyNth := queryParamInt(r, "everyNthFrame", 2)
+	everyNth := queryParamInt(r, "everyNthFrame", 4)
+	fps := queryParamInt(r, "fps", 1) // default 1 fps to save bandwidth
+	if fps > 30 {
+		fps = 30
+	}
+	minFrameInterval := time.Second / time.Duration(fps)
 
 	// Upgrade to WebSocket
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
@@ -71,16 +76,11 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	var once sync.Once
 	done := make(chan struct{})
 
-	// Listen for screencast frames
+	// Listen for screencast frames with rate limiting
+	var lastFrame time.Time
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch e := ev.(type) {
 		case *page.EventScreencastFrame:
-			// Decode base64 frame data
-			data, err := base64.StdEncoding.DecodeString(e.Data)
-			if err != nil {
-				return
-			}
-
 			// Ack the frame so Chrome sends the next one
 			go func() {
 				_ = chromedp.Run(ctx,
@@ -89,6 +89,19 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 					}),
 				)
 			}()
+
+			// Rate limit: skip frames if too fast
+			now := time.Now()
+			if now.Sub(lastFrame) < minFrameInterval {
+				return
+			}
+			lastFrame = now
+
+			// Decode base64 frame data
+			data, err := base64.StdEncoding.DecodeString(e.Data)
+			if err != nil {
+				return
+			}
 
 			// Non-blocking send
 			select {

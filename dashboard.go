@@ -1138,7 +1138,7 @@ async function viewInstanceLive(id, port) {
 }
 
 function startScreencastDirect(tabId, port) {
-  const wsUrl = 'ws://localhost:' + port + '/screencast?tabId=' + tabId + '&quality=50&maxWidth=800';
+  const wsUrl = 'ws://localhost:' + port + '/screencast?tabId=' + tabId + '&quality=30&maxWidth=800&fps=1';
   const socket = new WebSocket(wsUrl);
   socket.binaryType = 'arraybuffer';
   screencastSockets[tabId] = socket;
@@ -1223,7 +1223,7 @@ async function refreshTabs() {
 
 function startScreencast(tabId) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = proto + '//' + location.host + '/screencast?tabId=' + tabId + '&quality=50&maxWidth=800';
+  const wsUrl = proto + '//' + location.host + '/screencast?tabId=' + tabId + '&quality=30&maxWidth=800&fps=1';
   const socket = new WebSocket(wsUrl);
   socket.binaryType = 'arraybuffer';
   screencastSockets[tabId] = socket;
