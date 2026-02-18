@@ -1124,36 +1124,36 @@ function switchView(view) {
 // ---------------------------------------------------------------------------
 async function loadProfiles() {
   try {
-    // Fetch both profiles and running instances
-    const [profRes, instRes] = await Promise.all([
+    // Fetch profiles, instances, and main server info
+    const [profRes, instRes, healthRes, tabsRes] = await Promise.all([
       fetch('/profiles'),
-      fetch('/instances')
+      fetch('/instances'),
+      fetch('/health'),
+      fetch('/tabs')
     ]);
     const profiles = await profRes.json() || [];
     const instances = await instRes.json() || [];
+    const health = await healthRes.json();
+    const tabsData = await tabsRes.json();
 
     // Map running instances by profile name
     const running = {};
     instances.forEach(inst => { if (inst.status === 'running') running[inst.name] = inst; });
 
-    // Also include instances for profiles we don't have on disk yet
     const profileNames = new Set(profiles.map(p => p.name));
     const extraInstances = instances.filter(i => !profileNames.has(i.name));
 
     const grid = document.getElementById('profiles-grid');
+    const cards = [];
 
-    if (profiles.length === 0 && instances.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><div class="crab">🦀</div>No profiles yet.<br>Click <b>+ New Profile</b> to create one.</div>';
-      return;
-    }
+    // Main instance card (always first)
+    cards.push(renderMainCard(tabsData.tabs ? tabsData.tabs.length : 0));
 
-    const cards = profiles.map(p => {
-      const inst = running[p.name];
-      const isRunning = !!inst;
-      return renderProfileCard(p.name, p.sizeMB, p.source, inst);
+    // Profile cards
+    profiles.forEach(p => {
+      cards.push(renderProfileCard(p.name, p.sizeMB, p.source, running[p.name] || null));
     });
 
-    // Add running instances without profiles on disk
     extraInstances.forEach(inst => {
       cards.push(renderProfileCard(inst.name, 0, 'instance', inst.status === 'running' ? inst : null));
     });
@@ -1162,6 +1162,27 @@ async function loadProfiles() {
   } catch (e) {
     console.error('Failed to load profiles', e);
   }
+}
+
+function renderMainCard(tabCount) {
+  return ` + "`" + `
+    <div class="inst-card" style="border-color:#f5c542">
+      <div class="inst-header">
+        <span class="inst-name">🦀 Main</span>
+        <span class="inst-badge running">running :${location.port || '9867'}</span>
+      </div>
+      <div class="inst-body">
+        <div class="inst-row"><span class="label">Mode</span><span class="value">${document.title.includes('headed') ? '🖥️ Headed' : '🔲 Current instance'}</span></div>
+        <div class="inst-row"><span class="label">Tabs</span><span class="value">${tabCount}</span></div>
+        <div class="inst-row"><span class="label">Port</span><span class="value">${location.port || '9867'}</span></div>
+      </div>
+      <div class="inst-actions">
+        <button onclick="switchView('live')">📺 Live</button>
+        <button onclick="switchView('feed')">🤖 Agents</button>
+        <button onclick="switchView('settings')">⚙️ Settings</button>
+      </div>
+    </div>
+  ` + "`" + `;
 }
 
 function renderProfileCard(name, sizeMB, source, inst) {
