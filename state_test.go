@@ -12,7 +12,6 @@ func TestMarkCleanExit_NoFile(t *testing.T) {
 	profileDir = t.TempDir()
 	defer func() { profileDir = origProfileDir }()
 
-	// Should not panic when file doesn't exist
 	markCleanExit()
 }
 
@@ -89,7 +88,7 @@ func TestSessionState_Marshal(t *testing.T) {
 
 func TestSaveState_NoBrowser(t *testing.T) {
 	b := newTestBridge()
-	// Should not panic — just logs error and returns
+
 	b.SaveState()
 }
 
@@ -99,7 +98,7 @@ func TestRestoreState_NoFile(t *testing.T) {
 	defer func() { stateDir = origStateDir }()
 
 	b := newTestBridge()
-	// Should not panic when file doesn't exist
+
 	b.RestoreState()
 }
 
@@ -113,7 +112,7 @@ func TestRestoreState_EmptyTabs(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(stateDir, "sessions.json"), data, 0644)
 
 	b := newTestBridge()
-	// Should return early — no tabs to restore
+
 	b.RestoreState()
 }
 
@@ -125,7 +124,7 @@ func TestRestoreState_InvalidJSON(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(stateDir, "sessions.json"), []byte("{broken"), 0644)
 
 	b := newTestBridge()
-	// Should not panic on invalid JSON
+
 	b.RestoreState()
 }
 
@@ -195,6 +194,5 @@ func TestClearChromeSessions_NoDir(t *testing.T) {
 	profileDir = tmp
 	defer func() { profileDir = origProfile }()
 
-	// Should not panic when dir doesn't exist
 	clearChromeSessions()
 }

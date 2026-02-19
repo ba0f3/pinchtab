@@ -16,16 +16,12 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
-// ---------------------------------------------------------------------------
-// Screencast — streams live JPEG frames from Chrome tabs over WebSocket
-// ---------------------------------------------------------------------------
-
 // handleScreencast upgrades to WebSocket and streams screencast frames for a tab.
 // Query params: tabId (required), quality (1-100, default 40), maxWidth (default 800), fps (1-30, default 5)
 func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	tabID := r.URL.Query().Get("tabId")
 	if tabID == "" {
-		// Use first available tab
+
 		b.mu.RLock()
 		for id := range b.tabs {
 			tabID = id
@@ -38,10 +34,9 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	tab, ok := b.tabs[tabID]
 	b.mu.RUnlock()
 
-	// If tab isn't tracked (e.g. manually opened in headed mode), create a context for it
 	if !ok {
 		tabCtx, _ := chromedp.NewContext(b.browserCtx, chromedp.WithTargetID(target.ID(tabID)))
-		// Quick ping to verify the target exists
+
 		if err := chromedp.Run(tabCtx); err != nil {
 			http.Error(w, "tab not found", 404)
 			return
@@ -52,13 +47,12 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	quality := queryParamInt(r, "quality", 30)
 	maxWidth := queryParamInt(r, "maxWidth", 800)
 	everyNth := queryParamInt(r, "everyNthFrame", 4)
-	fps := queryParamInt(r, "fps", 1) // default 1 fps to save bandwidth
+	fps := queryParamInt(r, "fps", 1)
 	if fps > 30 {
 		fps = 30
 	}
 	minFrameInterval := time.Second / time.Duration(fps)
 
-	// Upgrade to WebSocket
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		slog.Error("ws upgrade failed", "err", err)
@@ -71,7 +65,6 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Channel for frames
 	frameCh := make(chan []byte, 3)
 	var once sync.Once
 	done := make(chan struct{})
@@ -81,7 +74,7 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch e := ev.(type) {
 		case *page.EventScreencastFrame:
-			// Ack the frame so Chrome sends the next one
+
 			go func() {
 				_ = chromedp.Run(ctx,
 					chromedp.ActionFunc(func(c context.Context) error {
@@ -90,29 +83,25 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 				)
 			}()
 
-			// Rate limit: skip frames if too fast
 			now := time.Now()
 			if now.Sub(lastFrame) < minFrameInterval {
 				return
 			}
 			lastFrame = now
 
-			// Decode base64 frame data
 			data, err := base64.StdEncoding.DecodeString(e.Data)
 			if err != nil {
 				return
 			}
 
-			// Non-blocking send
 			select {
 			case frameCh <- data:
 			default:
-				// Drop frame if consumer is slow
+
 			}
 		}
 	})
 
-	// Start screencast
 	err = chromedp.Run(ctx,
 		chromedp.ActionFunc(func(c context.Context) error {
 			return page.StartScreencast().
@@ -140,7 +129,6 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("screencast started", "tab", tabID, "quality", quality, "maxWidth", maxWidth)
 
-	// Read pump — detect client disconnect
 	go func() {
 		for {
 			_, _, err := wsutil.ReadClientData(conn)
@@ -151,7 +139,6 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Write pump — send frames to WebSocket client
 	for {
 		select {
 		case frame := <-frameCh:
@@ -161,7 +148,7 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 		case <-done:
 			return
 		case <-time.After(10 * time.Second):
-			// Keepalive ping if no frames
+
 			if err := wsutil.WriteServerMessage(conn, ws.OpPing, nil); err != nil {
 				return
 			}
@@ -173,8 +160,8 @@ func (b *Bridge) handleScreencast(w http.ResponseWriter, r *http.Request) {
 // Uses CDP target discovery to find ALL tabs, not just ones in bridge.tabs.
 func (b *Bridge) handleScreencastAll(w http.ResponseWriter, r *http.Request) {
 	type tabInfo struct {
-		ID  string `json:"id"`
-		URL string `json:"url,omitempty"`
+		ID    string `json:"id"`
+		URL   string `json:"url,omitempty"`
 		Title string `json:"title,omitempty"`
 	}
 
@@ -186,7 +173,7 @@ func (b *Bridge) handleScreencastAll(w http.ResponseWriter, r *http.Request) {
 
 	targets, err := target.GetTargets().Do(ctx)
 	if err != nil {
-		// Fallback to bridge.tabs
+
 		b.mu.RLock()
 		defer b.mu.RUnlock()
 		tabs := make([]tabInfo, 0, len(b.tabs))

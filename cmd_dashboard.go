@@ -17,7 +17,7 @@ import (
 // runDashboard starts a lightweight dashboard server — no Chrome, no bridge.
 // It manages Pinchtab instances via the orchestrator and serves the dashboard UI.
 func runDashboard() {
-	dashPort := port // reuse --port / BRIDGE_PORT
+	dashPort := port
 	if dashPort == "" {
 		dashPort = "9870"
 	}
@@ -33,18 +33,14 @@ func runDashboard() {
 
 	mux := http.NewServeMux()
 
-	// Dashboard UI + SSE
 	dashboard.RegisterHandlers(mux)
 	orchestrator.RegisterHandlers(mux)
 	profMgr.RegisterHandlers(mux)
 
-	// Health endpoint for the dashboard itself
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, 200, map[string]string{"status": "ok", "mode": "dashboard"})
 	})
 
-	// Proxy common bridge endpoints to the default instance
-	// This lets the dashboard UI call /tabs, /screencast/tabs etc on the dashboard port
 	proxyEndpoints := []string{
 		"/tabs", "/snapshot", "/screenshot", "/text",
 		"/navigate", "/action", "/actions", "/evaluate",
@@ -53,9 +49,9 @@ func runDashboard() {
 		"/screencast", "/screencast/tabs",
 	}
 	for _, ep := range proxyEndpoints {
-		endpoint := ep // capture
+		endpoint := ep
 		mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
-			// Find first running instance and proxy to it
+
 			instances := orchestrator.List()
 			var target string
 			for _, inst := range instances {
@@ -72,7 +68,6 @@ func runDashboard() {
 		})
 	}
 
-	// Profile observer
 	profileObserver := func(evt AgentEvent) {
 		if evt.Profile != "" {
 			profMgr.tracker.Record(evt.Profile, ActionRecord{
@@ -94,7 +89,6 @@ func runDashboard() {
 
 	srv := &http.Server{Addr: ":" + dashPort, Handler: handler}
 
-	// Auto-launch default instance if configured
 	defaultProfile := os.Getenv("PINCHTAB_DEFAULT_PROFILE")
 	defaultPort := os.Getenv("PINCHTAB_DEFAULT_PORT")
 	if defaultPort == "" {
@@ -104,13 +98,12 @@ func runDashboard() {
 		defaultProfile = "default"
 	}
 
-	// Ensure default profile exists
 	os.MkdirAll(filepath.Join(profilesDir, defaultProfile, "Default"), 0755)
 
 	autoLaunch := os.Getenv("PINCHTAB_NO_AUTO_LAUNCH") == ""
 	if autoLaunch {
 		go func() {
-			// Wait for server to be ready
+
 			time.Sleep(500 * time.Millisecond)
 			headlessDefault := os.Getenv("PINCHTAB_HEADED") == ""
 			inst, err := orchestrator.Launch(defaultProfile, defaultPort, headlessDefault)
@@ -122,7 +115,6 @@ func runDashboard() {
 		}()
 	}
 
-	// Shutdown
 	shutdownOnce := &sync.Once{}
 	doShutdown := func() {
 		shutdownOnce.Do(func() {
@@ -158,18 +150,16 @@ func runDashboard() {
 // proxyRequest forwards an HTTP request to a target URL.
 // For WebSocket upgrades (screencast), it does a WebSocket proxy.
 func proxyRequest(w http.ResponseWriter, r *http.Request, targetURL string) {
-	// Preserve query params
+
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
 	}
 
-	// Check if this is a WebSocket upgrade (screencast)
 	if isWebSocketUpgrade(r) {
 		proxyWebSocket(w, r, targetURL)
 		return
 	}
 
-	// Regular HTTP proxy
 	client := &http.Client{Timeout: 30 * time.Second}
 	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, targetURL, r.Body)
 	if err != nil {
@@ -177,7 +167,6 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, targetURL string) {
 		return
 	}
 
-	// Forward headers
 	for k, vv := range r.Header {
 		for _, v := range vv {
 			proxyReq.Header.Add(k, v)
@@ -191,7 +180,6 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, targetURL string) {
 	}
 	defer resp.Body.Close()
 
-	// Copy response
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)

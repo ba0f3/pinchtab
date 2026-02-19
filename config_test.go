@@ -61,16 +61,14 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestLoadConfig_FromFile(t *testing.T) {
-	// Save original values
+
 	origPort := port
 	defer func() { port = origPort }()
 
-	// Create a temp config file
 	dir := t.TempDir()
 	configPath := dir + "/config.json"
 	_ = os.WriteFile(configPath, []byte(`{"port":"7777"}`), 0644)
 
-	// Ensure env vars don't interfere
 	t.Setenv("BRIDGE_PORT", "")
 	t.Setenv("BRIDGE_CONFIG", configPath)
 
@@ -88,14 +86,12 @@ func TestLoadConfig_EnvOverridesFile(t *testing.T) {
 	configPath := dir + "/config.json"
 	_ = os.WriteFile(configPath, []byte(`{"port":"7777"}`), 0644)
 
-	// Set BRIDGE_PORT env — loadConfig should NOT override port from file
 	t.Setenv("BRIDGE_CONFIG", configPath)
 	t.Setenv("BRIDGE_PORT", "8888")
 
-	// Simulate what happens: port was set at init from env, so set it manually
 	port = "8888"
 	loadConfig()
-	// File says 7777, but env is set so loadConfig should leave port alone
+
 	if port != "8888" {
 		t.Errorf("env should override file: port = %q, want 8888", port)
 	}
@@ -106,21 +102,20 @@ func TestLoadConfig_InvalidJSON(t *testing.T) {
 	configPath := dir + "/config.json"
 	_ = os.WriteFile(configPath, []byte("{broken json!!!"), 0644)
 
-	// Save and restore global state
 	origPort := port
 	defer func() { port = origPort }()
 
 	t.Setenv("BRIDGE_CONFIG", configPath)
 	t.Setenv("BRIDGE_PORT", "")
 	port = "9867"
-	loadConfig() // should not panic, should keep defaults
+	loadConfig()
 	if port != "9867" {
 		t.Errorf("invalid config should not change port, got %q", port)
 	}
 }
 
 func TestConstants(t *testing.T) {
-	// Verify constants are what handlers expect
+
 	if actionClick != "click" {
 		t.Error("actionClick mismatch")
 	}

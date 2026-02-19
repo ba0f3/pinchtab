@@ -1,4 +1,5 @@
-package main
+package // Config represents the configuration file structure.
+main
 
 import (
 	_ "embed"
@@ -10,16 +11,12 @@ import (
 	"time"
 )
 
-// Body size limit for POST handlers.
-const maxBodySize = 1 << 20 // 1MB
+const maxBodySize = 1 << 20
 
-// Target type for Chrome DevTools Protocol.
 const targetTypePage = "page"
 
-// Snapshot filter values.
 const filterInteractive = "interactive"
 
-// Action kinds for /action endpoint.
 const (
 	actionClick      = "click"
 	actionType       = "type"
@@ -33,37 +30,33 @@ const (
 	actionHumanType  = "humanType"
 )
 
-// Tab actions for /tab endpoint.
 const (
 	tabActionNew   = "new"
 	tabActionClose = "close"
 )
 
-//go:embed stealth.js
 var stealthScript string
 
-//go:embed readability.js
 var readabilityJS string
 
-//go:embed welcome.html
 var welcomeHTML string
 
 var (
 	port             = envOr("BRIDGE_PORT", "9867")
-	cdpURL           = os.Getenv("CDP_URL") // empty = launch Chrome ourselves
+	cdpURL           = os.Getenv("CDP_URL")
 	token            = os.Getenv("BRIDGE_TOKEN")
 	stateDir         = envOr("BRIDGE_STATE_DIR", filepath.Join(homeDir(), ".pinchtab"))
 	headless         = os.Getenv("BRIDGE_HEADLESS") == "true"
 	noRestore        = os.Getenv("BRIDGE_NO_RESTORE") == "true"
 	profileDir       = envOr("BRIDGE_PROFILE", filepath.Join(homeDir(), ".pinchtab", "chrome-profile"))
 	chromeVersion    = envOr("BRIDGE_CHROME_VERSION", "144.0.7559.133")
-	timezone         = os.Getenv("BRIDGE_TIMEZONE") // e.g. "America/New_York"
+	timezone         = os.Getenv("BRIDGE_TIMEZONE")
 	blockImages      = os.Getenv("BRIDGE_BLOCK_IMAGES") == "true"
-	blockMedia       = os.Getenv("BRIDGE_BLOCK_MEDIA") == "true" // superset: images + fonts + CSS + video
-	chromeBinary     = os.Getenv("CHROME_BINARY")                // path to Chrome/Chromium binary
-	chromeExtraFlags = os.Getenv("CHROME_FLAGS")                 // extra flags (space-separated)
+	blockMedia       = os.Getenv("BRIDGE_BLOCK_MEDIA") == "true"
+	chromeBinary     = os.Getenv("CHROME_BINARY")
+	chromeExtraFlags = os.Getenv("CHROME_FLAGS")
 	noAnimations     = os.Getenv("BRIDGE_NO_ANIMATIONS") == "true"
-	stealthLevel     = envOr("BRIDGE_STEALTH", "light") // "light" or "full"
+	stealthLevel     = envOr("BRIDGE_STEALTH", "light")
 	actionTimeout    = 15 * time.Second
 	navigateTimeout  = 30 * time.Second
 	shutdownTimeout  = 10 * time.Second
@@ -82,7 +75,6 @@ func homeDir() string {
 	return h
 }
 
-// Config represents the configuration file structure
 type Config struct {
 	Port        string `json:"port"`
 	CdpURL      string `json:"cdpUrl,omitempty"`
@@ -95,18 +87,16 @@ type Config struct {
 	NavigateSec int    `json:"navigateSec,omitempty"`
 }
 
-// loadConfig loads configuration from file or environment variables
 func loadConfig() {
-	// Default config file location
+
 	configPath := envOr("BRIDGE_CONFIG", filepath.Join(homeDir(), ".pinchtab", "config.json"))
 
-	// Try to load config file
 	if data, err := os.ReadFile(configPath); err == nil {
 		var cfg Config
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			slog.Warn("invalid JSON in config file, ignoring", "path", configPath, "err", err)
 		} else {
-			// Apply config file values (env vars take precedence)
+
 			if cfg.Port != "" && os.Getenv("BRIDGE_PORT") == "" {
 				port = cfg.Port
 			}
@@ -138,7 +128,6 @@ func loadConfig() {
 	}
 }
 
-// defaultConfig returns a default configuration
 func defaultConfig() Config {
 	return Config{
 		Port:        "9867",
@@ -151,7 +140,6 @@ func defaultConfig() Config {
 	}
 }
 
-// handleConfigCommand handles the 'config' subcommand
 func handleConfigCommand() {
 	if len(os.Args) < 3 {
 		fmt.Println("Usage: pinchtab config <command>")
@@ -165,7 +153,6 @@ func handleConfigCommand() {
 	case "init":
 		configPath := filepath.Join(homeDir(), ".pinchtab", "config.json")
 
-		// Check if config already exists
 		if _, err := os.Stat(configPath); err == nil {
 			fmt.Printf("Config file already exists at %s\n", configPath)
 			fmt.Print("Overwrite? (y/N): ")
@@ -176,13 +163,11 @@ func handleConfigCommand() {
 			}
 		}
 
-		// Create directory if needed
 		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 			fmt.Printf("Error creating directory: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Write default config
 		cfg := defaultConfig()
 		data, _ := json.MarshalIndent(cfg, "", "  ")
 		if err := os.WriteFile(configPath, data, 0644); err != nil {

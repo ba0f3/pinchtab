@@ -1,4 +1,12 @@
-package main
+package // List returns all managed profiles.
+// Import copies an existing Chrome user data directory as a named profile.
+// Create makes a fresh empty profile directory.
+// Reset clears session data and caches but preserves bookmarks, extensions, passwords.
+// Delete removes a profile entirely.
+// Logs returns recent Chrome/Pinchtab logs for a profile.
+// Analytics returns action patterns and optimization suggestions.
+// TrackingMiddleware returns middleware that records actions per profile.
+main
 
 import (
 	"encoding/json"
@@ -16,12 +24,8 @@ import (
 	"os/exec"
 )
 
-// ---------------------------------------------------------------------------
-// Profile Manager — manages named Chrome profiles under ~/.pinchtab/profiles/
-// ---------------------------------------------------------------------------
-
 type ProfileManager struct {
-	baseDir string // e.g. ~/.pinchtab/profiles
+	baseDir string
 	tracker *ActionTracker
 	mu      sync.RWMutex
 }
@@ -31,7 +35,7 @@ type ProfileInfo struct {
 	Path      string    `json:"path"`
 	CreatedAt time.Time `json:"createdAt"`
 	SizeMB    float64   `json:"sizeMB"`
-	Source    string    `json:"source,omitempty"` // "imported", "created"
+	Source    string    `json:"source,omitempty"`
 }
 
 func NewProfileManager(baseDir string) *ProfileManager {
@@ -42,7 +46,6 @@ func NewProfileManager(baseDir string) *ProfileManager {
 	}
 }
 
-// List returns all managed profiles.
 func (pm *ProfileManager) List() ([]ProfileInfo, error) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -53,7 +56,7 @@ func (pm *ProfileManager) List() ([]ProfileInfo, error) {
 	}
 
 	var profiles []ProfileInfo
-	// Directories that aren't profiles
+
 	skip := map[string]bool{"bin": true, "profiles": true}
 	for _, e := range entries {
 		if !e.IsDir() || skip[e.Name()] {
@@ -63,7 +66,7 @@ func (pm *ProfileManager) List() ([]ProfileInfo, error) {
 		if err != nil {
 			continue
 		}
-		// Must have a Default/ subdirectory to be a valid Chrome profile
+
 		if _, err := os.Stat(filepath.Join(pm.baseDir, e.Name(), "Default")); err != nil {
 			continue
 		}
@@ -95,7 +98,6 @@ func (pm *ProfileManager) profileInfo(name string) (ProfileInfo, error) {
 	}, nil
 }
 
-// Import copies an existing Chrome user data directory as a named profile.
 func (pm *ProfileManager) Import(name, sourcePath string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -105,9 +107,8 @@ func (pm *ProfileManager) Import(name, sourcePath string) error {
 		return fmt.Errorf("profile %q already exists", name)
 	}
 
-	// Validate source looks like a Chrome profile
 	if _, err := os.Stat(filepath.Join(sourcePath, "Default")); err != nil {
-		// Maybe it IS the Default folder
+
 		if _, err2 := os.Stat(filepath.Join(sourcePath, "Preferences")); err2 != nil {
 			return fmt.Errorf("source doesn't look like a Chrome user data dir (no Default/ or Preferences found)")
 		}
@@ -118,12 +119,10 @@ func (pm *ProfileManager) Import(name, sourcePath string) error {
 		return fmt.Errorf("copy failed: %w", err)
 	}
 
-	// Mark as imported
 	os.WriteFile(filepath.Join(dest, ".pinchtab-imported"), []byte(sourcePath), 0644)
 	return nil
 }
 
-// Create makes a fresh empty profile directory.
 func (pm *ProfileManager) Create(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -135,7 +134,6 @@ func (pm *ProfileManager) Create(name string) error {
 	return os.MkdirAll(filepath.Join(dest, "Default"), 0755)
 }
 
-// Reset clears session data and caches but preserves bookmarks, extensions, passwords.
 func (pm *ProfileManager) Reset(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -145,7 +143,6 @@ func (pm *ProfileManager) Reset(name string) error {
 		return fmt.Errorf("profile %q not found", name)
 	}
 
-	// Directories to nuke (session/cache data)
 	nukeDirs := []string{
 		"Default/Sessions",
 		"Default/Session Storage",
@@ -181,7 +178,6 @@ func (pm *ProfileManager) Reset(name string) error {
 	return nil
 }
 
-// Delete removes a profile entirely.
 func (pm *ProfileManager) Delete(name string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
@@ -193,41 +189,35 @@ func (pm *ProfileManager) Delete(name string) error {
 	return os.RemoveAll(dir)
 }
 
-// Logs returns recent Chrome/Pinchtab logs for a profile.
 func (pm *ProfileManager) Logs(name string, limit int) []ActionRecord {
 	return pm.tracker.GetLogs(name, limit)
 }
 
-// Analytics returns action patterns and optimization suggestions.
 func (pm *ProfileManager) Analytics(name string) AnalyticsReport {
 	return pm.tracker.Analyze(name)
 }
 
-// ---------------------------------------------------------------------------
-// Action Tracker — records API calls per profile for pattern analysis
-// ---------------------------------------------------------------------------
-
 type ActionTracker struct {
 	mu      sync.Mutex
-	records map[string][]ActionRecord // profile -> records
+	records map[string][]ActionRecord
 }
 
 type ActionRecord struct {
-	Timestamp time.Time `json:"timestamp"`
-	Method    string    `json:"method"`
-	Endpoint  string    `json:"endpoint"`
-	URL       string    `json:"url,omitempty"`    // target page URL if relevant
-	TabID     string    `json:"tabId,omitempty"`
-	DurationMs int64   `json:"durationMs"`
-	Status    int       `json:"status"`
+	Timestamp  time.Time `json:"timestamp"`
+	Method     string    `json:"method"`
+	Endpoint   string    `json:"endpoint"`
+	URL        string    `json:"url,omitempty"`
+	TabID      string    `json:"tabId,omitempty"`
+	DurationMs int64     `json:"durationMs"`
+	Status     int       `json:"status"`
 }
 
 type AnalyticsReport struct {
-	TotalActions    int                `json:"totalActions"`
-	Since           time.Time          `json:"since"`
-	TopEndpoints    []EndpointCount    `json:"topEndpoints"`
-	RepeatPatterns  []RepeatPattern    `json:"repeatPatterns"`
-	Suggestions     []string           `json:"suggestions"`
+	TotalActions   int             `json:"totalActions"`
+	Since          time.Time       `json:"since"`
+	TopEndpoints   []EndpointCount `json:"topEndpoints"`
+	RepeatPatterns []RepeatPattern `json:"repeatPatterns"`
+	Suggestions    []string        `json:"suggestions"`
 }
 
 type EndpointCount struct {
@@ -237,8 +227,8 @@ type EndpointCount struct {
 }
 
 type RepeatPattern struct {
-	Pattern   string `json:"pattern"`
-	Count     int    `json:"count"`
+	Pattern   string  `json:"pattern"`
+	Count     int     `json:"count"`
 	AvgGapSec float64 `json:"avgGapSec"`
 }
 
@@ -254,7 +244,7 @@ func (at *ActionTracker) Record(profile string, rec ActionRecord) {
 
 	recs := at.records[profile]
 	recs = append(recs, rec)
-	// Keep last 10000 records per profile
+
 	if len(recs) > 10000 {
 		recs = recs[len(recs)-10000:]
 	}
@@ -269,7 +259,7 @@ func (at *ActionTracker) GetLogs(profile string, limit int) []ActionRecord {
 	if limit <= 0 || limit > len(recs) {
 		limit = len(recs)
 	}
-	// Return most recent
+
 	start := len(recs) - limit
 	result := make([]ActionRecord, limit)
 	copy(result, recs[start:])
@@ -290,8 +280,10 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 		Since:        recs[0].Timestamp,
 	}
 
-	// Top endpoints
-	epCounts := map[string]struct{ count int; totalMs int64 }{}
+	epCounts := map[string]struct {
+		count   int
+		totalMs int64
+	}{}
 	for _, r := range recs {
 		v := epCounts[r.Endpoint]
 		v.count++
@@ -312,7 +304,6 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 		report.TopEndpoints = report.TopEndpoints[:10]
 	}
 
-	// Detect repeated snapshot patterns (same URL polled frequently)
 	urlSnaps := map[string][]time.Time{}
 	for _, r := range recs {
 		if r.Endpoint == "/snapshot" && r.URL != "" {
@@ -335,7 +326,6 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 		})
 	}
 
-	// Detect repeated navigate→snapshot sequences
 	navSnap := map[string]int{}
 	for i := 1; i < len(recs); i++ {
 		if recs[i-1].Endpoint == "/navigate" && recs[i].Endpoint == "/snapshot" {
@@ -352,7 +342,6 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 		}
 	}
 
-	// Generate suggestions
 	for _, rp := range report.RepeatPatterns {
 		if strings.HasPrefix(rp.Pattern, "snapshot") && rp.AvgGapSec > 0 && rp.AvgGapSec < 10 {
 			report.Suggestions = append(report.Suggestions,
@@ -364,7 +353,6 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 		}
 	}
 
-	// Check for heavy snapshot usage without selector/maxTokens
 	snapCount := 0
 	for _, r := range recs {
 		if r.Endpoint == "/snapshot" {
@@ -382,10 +370,6 @@ func (at *ActionTracker) Analyze(profile string) AnalyticsReport {
 
 	return report
 }
-
-// ---------------------------------------------------------------------------
-// HTTP Handlers
-// ---------------------------------------------------------------------------
 
 func (pm *ProfileManager) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /profiles", pm.handleList)
@@ -476,14 +460,12 @@ func (pm *ProfileManager) handleAnalytics(w http.ResponseWriter, r *http.Request
 	jsonResp(w, http.StatusOK, report)
 }
 
-// TrackingMiddleware returns middleware that records actions per profile.
 func (pm *ProfileManager) TrackingMiddleware(profileName string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: 200}
 		next.ServeHTTP(sw, r)
 
-		// Record the action
 		rec := ActionRecord{
 			Timestamp:  start,
 			Method:     r.Method,
@@ -496,11 +478,6 @@ func (pm *ProfileManager) TrackingMiddleware(profileName string, next http.Handl
 		pm.tracker.Record(profileName, rec)
 	})
 }
-
-// uses statusWriter from middleware.go
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func profileQueryInt(r *http.Request, key string, def int) int {
 	s := r.URL.Query().Get(key)

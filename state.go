@@ -1,4 +1,8 @@
-package main
+package // TabState represents a saved tab for session persistence.
+// SessionState is the on-disk format for saved sessions.
+// SaveState writes all open tab URLs to sessions.
+// RestoreState reopens tabs from the last saved session with concurrency limiting.
+main
 
 import (
 	"context"
@@ -12,20 +16,17 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// TabState represents a saved tab for session persistence.
 type TabState struct {
 	ID    string `json:"id"`
 	URL   string `json:"url"`
 	Title string `json:"title"`
 }
 
-// SessionState is the on-disk format for saved sessions.
 type SessionState struct {
 	Tabs    []TabState `json:"tabs"`
 	SavedAt string     `json:"savedAt"`
 }
 
-// markCleanExit patches Chrome's preferences to prevent "didn't shut down correctly" bar.
 func markCleanExit() {
 	prefsPath := filepath.Join(profileDir, "Default", "Preferences")
 	data, err := os.ReadFile(prefsPath)
@@ -41,8 +42,6 @@ func markCleanExit() {
 	}
 }
 
-// wasUncleanExit checks if the previous Chrome session exited uncleanly.
-// Returns true if Preferences contains exit_type:"Crashed".
 func wasUncleanExit() bool {
 	prefsPath := filepath.Join(profileDir, "Default", "Preferences")
 	data, err := os.ReadFile(prefsPath)
@@ -52,8 +51,6 @@ func wasUncleanExit() bool {
 	return strings.Contains(string(data), `"exit_type":"Crashed"`)
 }
 
-// clearChromeSessions removes Chrome's internal session restore data
-// (the Sessions/ folder that stores tabs to reopen after a crash).
 func clearChromeSessions() {
 	sessionsDir := filepath.Join(profileDir, "Default", "Sessions")
 	if err := os.RemoveAll(sessionsDir); err != nil {
@@ -63,7 +60,6 @@ func clearChromeSessions() {
 	}
 }
 
-// SaveState writes all open tab URLs to sessions.json.
 func (b *Bridge) SaveState() {
 	targets, err := b.ListTargets()
 	if err != nil {
@@ -104,7 +100,6 @@ func (b *Bridge) SaveState() {
 	}
 }
 
-// RestoreState reopens tabs from the last saved session with concurrency limiting.
 func (b *Bridge) RestoreState() {
 	path := filepath.Join(stateDir, "sessions.json")
 	data, err := os.ReadFile(path)
@@ -120,7 +115,6 @@ func (b *Bridge) RestoreState() {
 		return
 	}
 
-	// Limit concurrent tab creation to avoid overwhelming Chrome
 	const maxConcurrentTabs = 3
 	const maxConcurrentNavs = 2
 
@@ -133,19 +127,17 @@ func (b *Bridge) RestoreState() {
 			continue
 		}
 
-		// Acquire semaphore for tab creation
 		tabSem <- struct{}{}
 
-		// Small delay between tab creations to spread load
 		if restored > 0 {
 			time.Sleep(200 * time.Millisecond)
 		}
 
 		ctx, cancel := chromedp.NewContext(b.browserCtx)
-		// Just initialize the tab context (attaches to Chrome) — don't navigate yet.
+
 		if err := chromedp.Run(ctx); err != nil {
 			cancel()
-			<-tabSem // Release semaphore
+			<-tabSem
 			slog.Warn("restore tab failed", "url", tab.URL, "err", err)
 			continue
 		}
@@ -156,11 +148,9 @@ func (b *Bridge) RestoreState() {
 		b.mu.Unlock()
 		restored++
 
-		// Fire-and-forget navigate with concurrency limiting
 		go func(tabCtx context.Context, url string) {
-			defer func() { <-tabSem }() // Release tab semaphore when done
+			defer func() { <-tabSem }()
 
-			// Acquire navigation semaphore
 			navSem <- struct{}{}
 			defer func() { <-navSem }()
 

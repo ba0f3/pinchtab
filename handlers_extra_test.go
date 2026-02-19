@@ -149,8 +149,6 @@ func TestHandleShutdown_CallsFunc(t *testing.T) {
 	}
 }
 
-// ── Config extra tests ─────────────────────────────────────
-
 func TestLoadConfig_TimeoutFromFile(t *testing.T) {
 	tmp := t.TempDir()
 	cfgPath := filepath.Join(tmp, "config.json")
@@ -168,8 +166,7 @@ func TestLoadConfig_TimeoutFromFile(t *testing.T) {
 	}()
 
 	loadConfig()
-	// Config uses TimeoutSec/NavigateSec (int seconds), not duration strings
-	// So "25s" won't parse as int — this tests the no-op path
+
 }
 
 func TestLoadConfig_ConfigFileAllFields(t *testing.T) {
@@ -223,8 +220,6 @@ func TestLoadConfig_ConfigFileAllFields(t *testing.T) {
 	}
 }
 
-// ── helpers ────────────────────────────────────────────────
-
 // newBridgeWithFakeTab creates a Bridge with a real context.Context tab for testing
 // handler dispatch logic without needing Chrome.
 func newBridgeWithFakeTab() *Bridge {
@@ -232,7 +227,7 @@ func newBridgeWithFakeTab() *Bridge {
 	b.tabs = make(map[string]*TabEntry)
 	b.snapshots = make(map[string]*refCache)
 	ctx, cancel := context.WithCancel(context.Background())
-	_ = cancel // leaked intentionally in tests
+	_ = cancel
 	b.tabs["tab1"] = &TabEntry{ctx: ctx, cancel: cancel}
 	return b
 }

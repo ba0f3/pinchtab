@@ -15,13 +15,11 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// ── GET /stealth/status ────────────────────────────────────
-
 func (b *Bridge) handleStealthStatus(w http.ResponseWriter, r *http.Request) {
-	// Actually check features by evaluating in browser
+
 	ctx, _, err := b.TabContext("")
 	if err != nil {
-		// If no tab, return static analysis
+
 		b.sendStealthResponse(w, staticStealthFeatures(), "")
 		return
 	}
@@ -69,7 +67,6 @@ func (b *Bridge) handleStealthStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fallback to static
 	b.sendStealthResponse(w, staticStealthFeatures(), "")
 }
 
@@ -94,7 +91,7 @@ func staticStealthFeatures() map[string]bool {
 
 func (b *Bridge) sendStealthResponse(w http.ResponseWriter, features map[string]bool, userAgent string) {
 	chromeFlags := []string{
-		// Note: --disable-blink-features=AutomationControlled removed (deprecated Chrome 144+)
+
 		"--disable-features=IsolateOrigins,site-per-process",
 		"--disable-site-isolation-trials",
 		"--disable-web-security",
@@ -126,7 +123,6 @@ func (b *Bridge) sendStealthResponse(w http.ResponseWriter, features map[string]
 		level = "minimal"
 	}
 
-	// Use provided userAgent or get from browser if empty
 	if userAgent == "" && len(b.tabs) > 0 {
 		for _, tab := range b.tabs {
 			ctx, cancel := context.WithTimeout(tab.ctx, 1*time.Second)
@@ -179,8 +175,6 @@ func getStealthRecommendations(features map[string]bool) []string {
 	return recommendations
 }
 
-// ── POST /fingerprint/rotate ───────────────────────────────
-
 type fingerprintRequest struct {
 	TabID    string `json:"tabId"`
 	OS       string `json:"os"`
@@ -212,10 +206,9 @@ func (b *Bridge) handleFingerprintRotate(w http.ResponseWriter, r *http.Request)
 	tCtx, tCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer tCancel()
 
-	// CDP-level overrides (undetectable — no JS property redefinition)
 	if err := chromedp.Run(tCtx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			// UA, platform, accept-language at network level
+
 			err := emulation.SetUserAgentOverride(fp.UserAgent).
 				WithPlatform(fp.Platform).
 				WithAcceptLanguage(fp.Language).
@@ -230,7 +223,6 @@ func (b *Bridge) handleFingerprintRotate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// JS overrides for properties CDP doesn't cover (screen, hardware, vendor)
 	script := fmt.Sprintf(`
 (function() {
   Object.defineProperty(screen, 'width', { get: () => %d, configurable: true });
@@ -250,7 +242,7 @@ func (b *Bridge) handleFingerprintRotate(w http.ResponseWriter, r *http.Request)
 		}),
 		chromedp.Evaluate(script, nil),
 	); err != nil {
-		// Non-fatal: CDP overrides already applied for the important bits
+
 		slog.Warn("JS fingerprint extras failed", "err", err)
 	}
 

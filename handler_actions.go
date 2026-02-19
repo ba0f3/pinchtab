@@ -1,4 +1,5 @@
-package main
+package // ActionFunc handles a single action kind.
+main
 
 import (
 	"context"
@@ -13,9 +14,6 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// ── POST /action ───────────────────────────────────────────
-
-// actionRequest is the parsed JSON body for /action.
 type actionRequest struct {
 	TabID    string `json:"tabId"`
 	Kind     string `json:"kind"`
@@ -31,11 +29,8 @@ type actionRequest struct {
 	Fast     bool   `json:"fast"`
 }
 
-// ActionFunc handles a single action kind.
 type ActionFunc func(ctx context.Context, req actionRequest) (map[string]any, error)
 
-// initActionRegistry builds the action registry once. Call from main() after
-// Bridge is initialised; the result is stored in b.actions.
 func (b *Bridge) initActionRegistry() {
 	b.actions = map[string]ActionFunc{
 		actionClick: func(ctx context.Context, req actionRequest) (map[string]any, error) {
@@ -209,7 +204,6 @@ func (b *Bridge) handleAction(w http.ResponseWriter, r *http.Request) {
 	defer tCancel()
 	go cancelOnClientDone(r.Context(), tCancel)
 
-	// Resolve ref to backendNodeID from cached snapshot
 	if req.Ref != "" && req.NodeID == 0 && req.Selector == "" {
 		cache := b.GetRefCache(resolvedTabID)
 		if cache != nil {
@@ -256,8 +250,6 @@ func (b *Bridge) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	jsonResp(w, 200, result)
 }
-
-// ── POST /actions (batch) ──────────────────────────────────
 
 type actionsRequest struct {
 	TabID       string          `json:"tabId"`
@@ -312,7 +304,6 @@ func (b *Bridge) handleActions(w http.ResponseWriter, r *http.Request) {
 
 		tCtx, tCancel := context.WithTimeout(ctx, actionTimeout)
 
-		// Resolve ref
 		if action.Ref != "" && action.NodeID == 0 && action.Selector == "" {
 			cache := b.GetRefCache(resolvedTabID)
 			if cache != nil {

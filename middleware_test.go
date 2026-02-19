@@ -40,7 +40,7 @@ func TestJsonErr(t *testing.T) {
 }
 
 func TestAuthMiddleware_NoToken(t *testing.T) {
-	// When token is empty, all requests pass through
+
 	origToken := token
 	token = ""
 	defer func() { token = origToken }()
@@ -109,7 +109,6 @@ func TestCorsMiddleware(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 
-	// OPTIONS should return 204
 	req := httptest.NewRequest("OPTIONS", "/test", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -120,7 +119,6 @@ func TestCorsMiddleware(t *testing.T) {
 		t.Error("missing CORS origin header")
 	}
 
-	// GET should pass through with CORS headers
 	req = httptest.NewRequest("GET", "/test", nil)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)

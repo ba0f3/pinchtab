@@ -49,7 +49,6 @@ func TestProfileManagerImport(t *testing.T) {
 	dir := t.TempDir()
 	pm := NewProfileManager(dir)
 
-	// Create a fake Chrome profile source
 	src := filepath.Join(t.TempDir(), "chrome-src")
 	os.MkdirAll(filepath.Join(src, "Default"), 0755)
 	os.WriteFile(filepath.Join(src, "Default", "Preferences"), []byte(`{}`), 0644)
@@ -82,7 +81,6 @@ func TestProfileManagerReset(t *testing.T) {
 	pm := NewProfileManager(dir)
 	pm.Create("reset-me")
 
-	// Create some session data
 	sessDir := filepath.Join(dir, "reset-me", "Default", "Sessions")
 	os.MkdirAll(sessDir, 0755)
 	os.WriteFile(filepath.Join(sessDir, "session1"), []byte("data"), 0644)
@@ -100,7 +98,7 @@ func TestProfileManagerReset(t *testing.T) {
 	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
 		t.Error("Cache dir should be removed after reset")
 	}
-	// Profile itself should still exist
+
 	if _, err := os.Stat(filepath.Join(dir, "reset-me")); err != nil {
 		t.Error("Profile dir should still exist after reset")
 	}
@@ -134,12 +132,12 @@ func TestActionTracker(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		at.Record("prof1", ActionRecord{
-			Timestamp: time.Now().Add(time.Duration(i) * time.Second),
-			Method:    "GET",
-			Endpoint:  "/snapshot",
-			URL:       "https://example.com",
+			Timestamp:  time.Now().Add(time.Duration(i) * time.Second),
+			Method:     "GET",
+			Endpoint:   "/snapshot",
+			URL:        "https://example.com",
 			DurationMs: 100,
-			Status:    200,
+			Status:     200,
 		})
 	}
 
@@ -160,7 +158,6 @@ func TestActionTracker(t *testing.T) {
 func TestActionTrackerRepeatDetection(t *testing.T) {
 	at := NewActionTracker()
 
-	// Simulate rapid polling
 	for i := 0; i < 10; i++ {
 		at.Record("poller", ActionRecord{
 			Timestamp:  time.Now().Add(time.Duration(i) * 3 * time.Second),

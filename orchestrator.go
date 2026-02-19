@@ -1,4 +1,10 @@
-package main
+package // Launch starts a new Pinchtab instance on a named profile.
+// Stop kills a running instance.
+// List returns all instances with live status.
+// Logs returns the log buffer for an instance.
+// AllTabs aggregates tabs from all running instances.
+// ProxyScreencastURL returns the WebSocket URL for a child instance's screencast.
+main
 
 import (
 	"context"
@@ -15,14 +21,10 @@ import (
 	"time"
 )
 
-// ---------------------------------------------------------------------------
-// Orchestrator — manages multiple Pinchtab instances from one dashboard
-// ---------------------------------------------------------------------------
-
 type Orchestrator struct {
 	instances map[string]*Instance
-	baseDir   string // ~/.pinchtab/profiles
-	binary    string // path to pinchtab binary (or "go run .")
+	baseDir   string
+	binary    string
 	mu        sync.RWMutex
 	client    *http.Client
 }
@@ -33,7 +35,7 @@ type Instance struct {
 	Profile   string    `json:"profile"`
 	Port      string    `json:"port"`
 	Headless  bool      `json:"headless"`
-	Status    string    `json:"status"` // "starting", "running", "stopped", "error"
+	Status    string    `json:"status"`
 	PID       int       `json:"pid,omitempty"`
 	StartedAt time.Time `json:"startedAt"`
 	Error     string    `json:"error,omitempty"`
@@ -45,7 +47,6 @@ type Instance struct {
 	logBuf *ringBuffer
 }
 
-// ringBuffer keeps the last N bytes of output for log viewing.
 type ringBuffer struct {
 	mu   sync.Mutex
 	data []byte
@@ -73,17 +74,13 @@ func (rb *ringBuffer) String() string {
 }
 
 func NewOrchestrator(baseDir string) *Orchestrator {
-	// Resolve a stable binary path:
-	// 1. ~/.pinchtab/bin/pinchtab (installed)
-	// 2. Build from source if go available
-	// 3. os.Executable() fallback (fragile with go run)
+
 	binDir := filepath.Join(filepath.Dir(baseDir), "bin")
 	stableBin := filepath.Join(binDir, "pinchtab")
 
-	// If stable binary doesn't exist or is older than source, rebuild
 	needsBuild := true
 	if fi, err := os.Stat(stableBin); err == nil {
-		// Exists — check if it's recent enough (within 1 hour)
+
 		if time.Since(fi.ModTime()) < time.Hour {
 			needsBuild = false
 		}
@@ -91,7 +88,7 @@ func NewOrchestrator(baseDir string) *Orchestrator {
 
 	if needsBuild {
 		os.MkdirAll(binDir, 0755)
-		// Try to copy current executable
+
 		exe, _ := os.Executable()
 		if exe != "" {
 			if data, err := os.ReadFile(exe); err == nil {
@@ -104,7 +101,7 @@ func NewOrchestrator(baseDir string) *Orchestrator {
 
 	binary := stableBin
 	if _, err := os.Stat(binary); err != nil {
-		// Fallback
+
 		binary, _ = os.Executable()
 		if binary == "" {
 			binary = os.Args[0]
@@ -119,12 +116,10 @@ func NewOrchestrator(baseDir string) *Orchestrator {
 	}
 }
 
-// Launch starts a new Pinchtab instance on a named profile.
 func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	// Check port not already used
 	for _, inst := range o.instances {
 		if inst.Port == port && inst.Status == "running" {
 			return nil, fmt.Errorf("port %s already in use by instance %q", port, inst.Name)
@@ -152,13 +147,13 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 		"BRIDGE_PROFILE="+profilePath,
 		"BRIDGE_HEADLESS="+headlessStr,
 		"BRIDGE_NO_RESTORE=true",
-		// Don't start sub-orchestrators
+
 		"BRIDGE_NO_DASHBOARD=true",
 	)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	logBuf := newRingBuffer(64 * 1024) // 64KB log buffer
+	logBuf := newRingBuffer(64 * 1024)
 	cmd.Stdout = logBuf
 	cmd.Stderr = logBuf
 
@@ -184,14 +179,13 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 	inst.PID = cmd.Process.Pid
 	o.instances[id] = inst
 
-	// Monitor process + wait for healthy
 	go o.monitor(inst)
 
 	return inst, nil
 }
 
 func (o *Orchestrator) monitor(inst *Instance) {
-	// Wait for health check to pass
+
 	healthy := false
 	for i := 0; i < 30; i++ {
 		time.Sleep(500 * time.Millisecond)
@@ -216,7 +210,6 @@ func (o *Orchestrator) monitor(inst *Instance) {
 	}
 	o.mu.Unlock()
 
-	// Wait for process to exit
 	err := inst.cmd.Wait()
 	o.mu.Lock()
 	if inst.Status != "stopped" {
@@ -229,7 +222,6 @@ func (o *Orchestrator) monitor(inst *Instance) {
 	slog.Info("instance exited", "id", inst.ID)
 }
 
-// Stop kills a running instance.
 func (o *Orchestrator) Stop(id string) error {
 	o.mu.Lock()
 	inst, ok := o.instances[id]
@@ -240,16 +232,14 @@ func (o *Orchestrator) Stop(id string) error {
 	inst.Status = "stopped"
 	o.mu.Unlock()
 
-	// Graceful shutdown via API first
 	req, _ := http.NewRequest("POST", inst.URL+"/shutdown", nil)
 	resp, err := o.client.Do(req)
 	if err == nil {
 		resp.Body.Close()
-		// Wait a moment for graceful exit
+
 		time.Sleep(2 * time.Second)
 	}
 
-	// Force kill the whole process group (including Chrome children)
 	if inst.cmd.ProcessState == nil || !inst.cmd.ProcessState.Exited() {
 		_ = syscall.Kill(-inst.cmd.Process.Pid, syscall.SIGKILL)
 		inst.cancel()
@@ -258,7 +248,6 @@ func (o *Orchestrator) Stop(id string) error {
 	return nil
 }
 
-// List returns all instances with live status.
 func (o *Orchestrator) List() []Instance {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -270,7 +259,6 @@ func (o *Orchestrator) List() []Instance {
 		copy.cancel = nil
 		copy.logBuf = nil
 
-		// Fetch live tab count for running instances
 		if inst.Status == "running" {
 			if tabs, err := o.fetchTabs(inst.URL); err == nil {
 				copy.TabCount = len(tabs)
@@ -282,7 +270,6 @@ func (o *Orchestrator) List() []Instance {
 	return result
 }
 
-// Logs returns the log buffer for an instance.
 func (o *Orchestrator) Logs(id string) (string, error) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -294,7 +281,6 @@ func (o *Orchestrator) Logs(id string) (string, error) {
 	return inst.logBuf.String(), nil
 }
 
-// AllTabs aggregates tabs from all running instances.
 func (o *Orchestrator) AllTabs() []instanceTab {
 	o.mu.RLock()
 	instances := make([]*Instance, 0)
@@ -347,10 +333,6 @@ func (o *Orchestrator) fetchTabs(baseURL string) ([]remoteTab, error) {
 	json.NewDecoder(resp.Body).Decode(&tabs)
 	return tabs, nil
 }
-
-// ---------------------------------------------------------------------------
-// HTTP Handlers
-// ---------------------------------------------------------------------------
 
 func (o *Orchestrator) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /instances", o.handleList)
@@ -416,7 +398,6 @@ func (o *Orchestrator) handleAllTabs(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, 200, o.AllTabs())
 }
 
-// handleProxyScreencast proxies a WebSocket screencast from a child instance.
 func (o *Orchestrator) handleProxyScreencast(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	tabID := r.URL.Query().Get("tabId")
@@ -429,13 +410,10 @@ func (o *Orchestrator) handleProxyScreencast(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Proxy the WebSocket connection to the child instance
-	// For now, redirect — the dashboard JS will connect directly
 	targetURL := fmt.Sprintf("ws://localhost:%s/screencast?tabId=%s", inst.Port, tabID)
 	jsonResp(w, 200, map[string]string{"wsUrl": targetURL})
 }
 
-// ProxyScreencastURL returns the WebSocket URL for a child instance's screencast.
 func (o *Orchestrator) ScreencastURL(instanceID, tabID string) string {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -445,10 +423,6 @@ func (o *Orchestrator) ScreencastURL(instanceID, tabID string) string {
 	}
 	return fmt.Sprintf("ws://localhost:%s/screencast?tabId=%s", inst.Port, tabID)
 }
-
-// ---------------------------------------------------------------------------
-// Cleanup — stop all instances on shutdown
-// ---------------------------------------------------------------------------
 
 func (o *Orchestrator) Shutdown() {
 	o.mu.RLock()
@@ -466,7 +440,6 @@ func (o *Orchestrator) Shutdown() {
 	}
 }
 
-// readAll reads response body up to limit bytes
 func readAll(r io.Reader, limit int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r, limit))
 }

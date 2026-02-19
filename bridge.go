@@ -1,4 +1,14 @@
-package main
+package // TabEntry holds a chromedp context for an open tab.
+// Bridge is the central state holder for the Chrome connection, tab contexts, and per-tab snapshot caches.
+// TabContext returns the chromedp context for a tab and the resolved tabID.
+// CleanStaleTabs periodically removes tab entries whose Chrome targets no longer exist.
+// GetRefCache returns the cached snapshot refs for a tab (nil if none).
+// SetRefCache stores the snapshot ref cache for a tab.
+// DeleteRefCache removes the snapshot ref cache for a tab.
+// CreateTab opens a new tab, navigates to url, and returns its ID and context.
+// CloseTab closes a tab by ID and cleans up caches.
+// ListTargets returns all open page targets from Chrome.
+main
 
 import (
 	"context"
@@ -13,35 +23,27 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// TabEntry holds a chromedp context for an open tab.
 type TabEntry struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-// refCache stores the ref→backendNodeID mapping and the last snapshot nodes per tab.
-// Refs are assigned during /snapshot and looked up during /action, avoiding
-// a second a11y tree fetch that could drift.
 type refCache struct {
-	refs  map[string]int64 // "e0" → backendNodeID
-	nodes []A11yNode       // last snapshot for diff
+	refs  map[string]int64
+	nodes []A11yNode
 }
 
-// Bridge is the central state holder for the Chrome connection, tab contexts,
-// and per-tab snapshot caches.
 type Bridge struct {
 	allocCtx      context.Context
 	browserCtx    context.Context
 	tabs          map[string]*TabEntry
 	snapshots     map[string]*refCache
-	stealthScript string                // injected on every new tab
-	actions       map[string]ActionFunc // cached action registry (built once)
+	stealthScript string
+	actions       map[string]ActionFunc
 	locks         *lockManager
 	mu            sync.RWMutex
 }
 
-// injectStealth adds the stealth script to a tab context so it runs on every
-// new document load (including navigations).
 func (b *Bridge) injectStealth(ctx context.Context) {
 	if b.stealthScript == "" {
 		return
@@ -56,9 +58,6 @@ func (b *Bridge) injectStealth(ctx context.Context) {
 	}
 }
 
-// TabContext returns the chromedp context for a tab and the resolved tabID.
-// If tabID is empty, uses the first page target.
-// Uses RLock for cache hits, upgrades to Lock only when creating a new entry.
 func (b *Bridge) TabContext(tabID string) (context.Context, string, error) {
 	if tabID == "" {
 		targets, err := b.ListTargets()
@@ -71,7 +70,6 @@ func (b *Bridge) TabContext(tabID string) (context.Context, string, error) {
 		tabID = string(targets[0].TargetID)
 	}
 
-	// Fast path: read lock
 	b.mu.RLock()
 	if entry, ok := b.tabs[tabID]; ok && entry.ctx != nil {
 		b.mu.RUnlock()
@@ -79,7 +77,6 @@ func (b *Bridge) TabContext(tabID string) (context.Context, string, error) {
 	}
 	b.mu.RUnlock()
 
-	// Slow path: write lock, double-check
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -99,7 +96,6 @@ func (b *Bridge) TabContext(tabID string) (context.Context, string, error) {
 		return nil, "", fmt.Errorf("tab %s not found: %w", tabID, err)
 	}
 
-	// Inject stealth script on newly attached tabs
 	b.injectStealth(ctx)
 	if noAnimations {
 		b.injectNoAnimations(ctx)
@@ -109,8 +105,6 @@ func (b *Bridge) TabContext(tabID string) (context.Context, string, error) {
 	return ctx, tabID, nil
 }
 
-// CleanStaleTabs periodically removes tab entries whose Chrome targets
-// no longer exist. Exits when ctx is cancelled.
 func (b *Bridge) CleanStaleTabs(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -147,42 +141,36 @@ func (b *Bridge) CleanStaleTabs(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// GetRefCache returns the cached snapshot refs for a tab (nil if none).
 func (b *Bridge) GetRefCache(tabID string) *refCache {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.snapshots[tabID]
 }
 
-// SetRefCache stores the snapshot ref cache for a tab.
 func (b *Bridge) SetRefCache(tabID string, cache *refCache) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.snapshots[tabID] = cache
 }
 
-// DeleteRefCache removes the snapshot ref cache for a tab.
 func (b *Bridge) DeleteRefCache(tabID string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.snapshots, tabID)
 }
 
-// CreateTab opens a new tab, navigates to url, and returns its ID and context.
 func (b *Bridge) CreateTab(url string) (string, context.Context, context.CancelFunc, error) {
 	if b.browserCtx == nil {
 		return "", nil, nil, fmt.Errorf("no browser context available")
 	}
 	ctx, cancel := chromedp.NewContext(b.browserCtx)
 
-	// Inject stealth script before navigation so it applies to the first page load
 	b.injectStealth(ctx)
 
 	if noAnimations {
 		b.injectNoAnimations(ctx)
 	}
 
-	// Apply global resource blocking on new tabs
 	if blockMedia {
 		_ = setResourceBlocking(ctx, mediaBlockPatterns)
 	} else if blockImages {
@@ -206,32 +194,26 @@ func (b *Bridge) CreateTab(url string) (string, context.Context, context.CancelF
 	return newTargetID, ctx, cancel, nil
 }
 
-// CloseTab closes a tab by ID and cleans up caches.
 func (b *Bridge) CloseTab(tabID string) error {
 	b.mu.Lock()
 	entry, tracked := b.tabs[tabID]
 	b.mu.Unlock()
 
-	// Cancel the tab's chromedp context — this is the idiomatic way to close
-	// a tab in chromedp. It detaches from the target and lets Chrome clean up.
 	if tracked && entry.cancel != nil {
 		entry.cancel()
 	}
 
-	// Also send target.CloseTarget via the browser context for a clean CDP close.
 	closeCtx, closeCancel := context.WithTimeout(b.browserCtx, 5*time.Second)
 	defer closeCancel()
 
-	// Use the CDP executor directly (not chromedp.Run) to avoid context issues.
 	if err := target.CloseTarget(target.ID(tabID)).Do(cdp.WithExecutor(closeCtx, chromedp.FromContext(closeCtx).Browser)); err != nil {
-		// Target may already be gone after cancel — that's fine.
+
 		if !tracked {
 			return nil
 		}
 		slog.Debug("close target CDP", "tabId", tabID, "err", err)
 	}
 
-	// Clean up local state.
 	b.mu.Lock()
 	delete(b.tabs, tabID)
 	delete(b.snapshots, tabID)
@@ -240,7 +222,6 @@ func (b *Bridge) CloseTab(tabID string) error {
 	return nil
 }
 
-// ListTargets returns all open page targets from Chrome.
 func (b *Bridge) ListTargets() ([]*target.Info, error) {
 	if b.browserCtx == nil {
 		return nil, fmt.Errorf("no browser connection")

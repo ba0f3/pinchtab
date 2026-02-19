@@ -14,23 +14,23 @@ func TestDashboardRecordAndGetAgents(t *testing.T) {
 	d := NewDashboard(nil)
 
 	d.RecordEvent(AgentEvent{
-		AgentID:   "mario",
-		Profile:   "default",
-		Action:    "GET /snapshot",
-		URL:       "https://example.com",
-		TabID:     "tab1",
-		Status:    200,
+		AgentID:    "mario",
+		Profile:    "default",
+		Action:     "GET /snapshot",
+		URL:        "https://example.com",
+		TabID:      "tab1",
+		Status:     200,
 		DurationMs: 150,
-		Timestamp: time.Now(),
+		Timestamp:  time.Now(),
 	})
 
 	d.RecordEvent(AgentEvent{
-		AgentID:   "r40",
-		Action:    "POST /navigate",
-		URL:       "https://r40.io",
-		Status:    200,
+		AgentID:    "r40",
+		Action:     "POST /navigate",
+		URL:        "https://r40.io",
+		Status:     200,
 		DurationMs: 80,
-		Timestamp: time.Now(),
+		Timestamp:  time.Now(),
 	})
 
 	agents := d.GetAgents()
@@ -127,7 +127,6 @@ func TestDashboardSSEInit(t *testing.T) {
 	mux := http.NewServeMux()
 	d.RegisterHandlers(mux)
 
-	// Use a real test server with short-lived request
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
@@ -137,7 +136,7 @@ func TestDashboardSSEInit(t *testing.T) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/dashboard/events", nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		// Context deadline is expected
+
 		return
 	}
 	if resp != nil {
@@ -156,7 +155,6 @@ func TestTrackingMiddleware(t *testing.T) {
 		w.WriteHeader(200)
 	})
 
-	// Wire profile observer like main.go does
 	profileObs := func(evt AgentEvent) {
 		if evt.Profile != "" {
 			pm.tracker.Record(evt.Profile, ActionRecord{
@@ -183,7 +181,6 @@ func TestTrackingMiddleware(t *testing.T) {
 		t.Errorf("expected agent test-bot, got %s", agents[0].AgentID)
 	}
 
-	// Check profile tracker also recorded via observer
 	logs := pm.Logs("my-profile", 10)
 	if len(logs) != 1 {
 		t.Errorf("expected 1 profile log, got %d", len(logs))
@@ -198,7 +195,7 @@ func TestTrackingMiddlewareAnonymous(t *testing.T) {
 	})
 
 	handler := d.TrackingMiddleware(nil, inner)
-	// Use /snapshot (a real agent endpoint, not skipped)
+
 	req := httptest.NewRequest("GET", "/snapshot", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -218,7 +215,6 @@ func TestTrackingMiddlewareSkipsManagementRoutes(t *testing.T) {
 
 	handler := d.TrackingMiddleware(nil, inner)
 
-	// All of these should be skipped
 	for _, path := range []string{"/dashboard", "/profiles", "/instances", "/health", "/welcome", "/favicon.ico"} {
 		req := httptest.NewRequest("GET", path, nil)
 		w := httptest.NewRecorder()

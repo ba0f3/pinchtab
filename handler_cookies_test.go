@@ -34,7 +34,7 @@ func TestHandleSetCookies_NoTab(t *testing.T) {
 }
 
 func TestHandleGetCookies_NameFilter(t *testing.T) {
-	// Verify the name query param is parsed (can't test actual filtering without Chrome)
+
 	b := &Bridge{}
 	b.tabs = make(map[string]*TabEntry)
 	req := httptest.NewRequest("GET", "/cookies?name=session_id&tabId=nonexistent", nil)

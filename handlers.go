@@ -16,8 +16,6 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// ── GET /health ────────────────────────────────────────────
-
 func (b *Bridge) handleHealth(w http.ResponseWriter, r *http.Request) {
 	targets, err := b.ListTargets()
 	if err != nil {
@@ -26,8 +24,6 @@ func (b *Bridge) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResp(w, 200, map[string]any{"status": "ok", "tabs": len(targets), "cdp": cdpURL})
 }
-
-// ── GET /tabs ──────────────────────────────────────────────
 
 func (b *Bridge) handleTabs(w http.ResponseWriter, r *http.Request) {
 	targets, err := b.ListTargets()
@@ -52,8 +48,6 @@ func (b *Bridge) handleTabs(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResp(w, 200, map[string]any{"tabs": tabs})
 }
-
-// ── GET /screenshot ────────────────────────────────────────
 
 func (b *Bridge) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 	tabID := r.URL.Query().Get("tabId")
@@ -96,7 +90,6 @@ func (b *Bridge) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle file output
 	if output == "file" {
 		screenshotDir := filepath.Join(stateDir, "screenshots")
 		if err := os.MkdirAll(screenshotDir, 0755); err != nil {
@@ -135,8 +128,6 @@ func (b *Bridge) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 		"base64": base64.StdEncoding.EncodeToString(buf),
 	})
 }
-
-// ── GET /text ──────────────────────────────────────────────
 
 func (b *Bridge) handleText(w http.ResponseWriter, r *http.Request) {
 	tabID := r.URL.Query().Get("tabId")
@@ -182,8 +173,6 @@ func (b *Bridge) handleText(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ── POST /navigate ─────────────────────────────────────────
-
 func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TabID       string  `json:"tabId"`
@@ -203,7 +192,6 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compute title wait duration (default 2s, max 30s).
 	titleWait := time.Duration(0)
 	if req.WaitTitle > 0 {
 		if req.WaitTitle > 30 {
@@ -212,7 +200,6 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		titleWait = time.Duration(req.WaitTitle * float64(time.Second))
 	}
 
-	// Per-request navigate timeout (default: global navigateTimeout, max 120s).
 	navTimeout := navigateTimeout
 	if req.Timeout > 0 {
 		if req.Timeout > 120 {
@@ -228,11 +215,11 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	} else if req.BlockImages != nil && *req.BlockImages {
 		blockPatterns = imageBlockPatterns
 	} else if req.BlockImages != nil && !*req.BlockImages {
-		blockPatterns = nil // explicitly disabled
+		blockPatterns = nil
 	} else if blockMedia {
-		blockPatterns = mediaBlockPatterns // global BRIDGE_BLOCK_MEDIA
+		blockPatterns = mediaBlockPatterns
 	} else if blockImages {
-		blockPatterns = imageBlockPatterns // global BRIDGE_BLOCK_IMAGES
+		blockPatterns = imageBlockPatterns
 	}
 
 	if req.NewTab {
@@ -268,11 +255,10 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	defer tCancel()
 	go cancelOnClientDone(r.Context(), tCancel)
 
-	// Apply resource blocking before navigation.
 	if blockPatterns != nil {
 		_ = setResourceBlocking(tCtx, blockPatterns)
 	} else if blockImages {
-		// Clear any previous blocking if per-request disabled it.
+
 		_ = setResourceBlocking(tCtx, nil)
 	}
 
@@ -289,8 +275,6 @@ func (b *Bridge) handleNavigate(w http.ResponseWriter, r *http.Request) {
 
 	jsonResp(w, 200, map[string]any{"url": url, "title": title})
 }
-
-// ── POST /evaluate ─────────────────────────────────────────
 
 func (b *Bridge) handleEvaluate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -324,8 +308,6 @@ func (b *Bridge) handleEvaluate(w http.ResponseWriter, r *http.Request) {
 
 	jsonResp(w, 200, map[string]any{"result": result})
 }
-
-// ── POST /tab ──────────────────────────────────────────────
 
 func (b *Bridge) handleTab(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -367,8 +349,6 @@ func (b *Bridge) handleTab(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ── POST /tab/lock ─────────────────────────────────────────
-
 func (b *Bridge) handleTabLock(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TabID      string `json:"tabId"`
@@ -402,8 +382,6 @@ func (b *Bridge) handleTabLock(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ── POST /tab/unlock ───────────────────────────────────────
-
 func (b *Bridge) handleTabUnlock(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TabID string `json:"tabId"`
@@ -426,20 +404,14 @@ func (b *Bridge) handleTabUnlock(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, 200, map[string]any{"unlocked": true})
 }
 
-// ── POST /shutdown ─────────────────────────────────────────
-
 func (b *Bridge) handleShutdown(shutdownFn func()) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("shutdown requested via API")
 		jsonResp(w, 200, map[string]any{"status": "shutting down"})
 
-		// Trigger shutdown in background so the response gets sent first.
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			shutdownFn()
 		}()
 	}
 }
-
-// Shared helpers (jsonResp, jsonErr, cancelOnClientDone, waitForTitle)
-// are defined in middleware.go and cdp.go respectively.

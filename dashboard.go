@@ -1,4 +1,9 @@
-package main
+package // DashboardConfig holds tunable timeouts for agent status transitions.
+// Shutdown stops the reaper goroutine.
+// RecordEvent processes an agent action and broadcasts to SSE subscribers.
+// GetAgents returns current state of all agents.
+// EventObserver receives agent events for additional processing (e.
+main
 
 import (
 	"context"
@@ -12,42 +17,36 @@ import (
 	"time"
 )
 
-// DashboardConfig holds tunable timeouts for agent status transitions.
 type DashboardConfig struct {
-	IdleTimeout       time.Duration // time before agent marked idle (default 30s)
-	DisconnectTimeout time.Duration // time before agent marked disconnected (default 5m)
-	ReaperInterval    time.Duration // how often to check agent status (default 10s)
-	SSEBufferSize     int           // per-client SSE channel buffer (default 64)
+	IdleTimeout       time.Duration
+	DisconnectTimeout time.Duration
+	ReaperInterval    time.Duration
+	SSEBufferSize     int
 }
 
-//go:embed dashboard
 var dashboardFS embed.FS
 
-// ---------------------------------------------------------------------------
-// Agent Activity — tracks what each agent is doing in real time
-// ---------------------------------------------------------------------------
-
 type AgentActivity struct {
-	AgentID    string    `json:"agentId"`
-	Profile    string    `json:"profile,omitempty"`
-	CurrentURL string    `json:"currentUrl,omitempty"`
-	CurrentTab string    `json:"currentTab,omitempty"`
-	LastAction string    `json:"lastAction,omitempty"`
-	LastSeen   time.Time `json:"lastSeen"`
-	Status     string    `json:"status"` // "active", "idle", "disconnected"
-	ActionCount int      `json:"actionCount"`
+	AgentID     string    `json:"agentId"`
+	Profile     string    `json:"profile,omitempty"`
+	CurrentURL  string    `json:"currentUrl,omitempty"`
+	CurrentTab  string    `json:"currentTab,omitempty"`
+	LastAction  string    `json:"lastAction,omitempty"`
+	LastSeen    time.Time `json:"lastSeen"`
+	Status      string    `json:"status"`
+	ActionCount int       `json:"actionCount"`
 }
 
 type AgentEvent struct {
-	AgentID   string `json:"agentId"`
-	Profile   string `json:"profile,omitempty"`
-	Action    string `json:"action"`
-	URL       string `json:"url,omitempty"`
-	TabID     string `json:"tabId,omitempty"`
-	Detail    string `json:"detail,omitempty"`
-	Status    int    `json:"status"`
-	DurationMs int64 `json:"durationMs"`
-	Timestamp time.Time `json:"timestamp"`
+	AgentID    string    `json:"agentId"`
+	Profile    string    `json:"profile,omitempty"`
+	Action     string    `json:"action"`
+	URL        string    `json:"url,omitempty"`
+	TabID      string    `json:"tabId,omitempty"`
+	Detail     string    `json:"detail,omitempty"`
+	Status     int       `json:"status"`
+	DurationMs int64     `json:"durationMs"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 type Dashboard struct {
@@ -91,7 +90,6 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 	return d
 }
 
-// Shutdown stops the reaper goroutine.
 func (d *Dashboard) Shutdown() { d.cancel() }
 
 func (d *Dashboard) reaper(ctx context.Context) {
@@ -119,7 +117,6 @@ func (d *Dashboard) reaper(ctx context.Context) {
 	}
 }
 
-// RecordEvent processes an agent action and broadcasts to SSE subscribers.
 func (d *Dashboard) RecordEvent(evt AgentEvent) {
 	d.mu.Lock()
 
@@ -140,23 +137,20 @@ func (d *Dashboard) RecordEvent(evt AgentEvent) {
 		a.CurrentTab = evt.TabID
 	}
 
-	// Copy SSE channels
 	chans := make([]chan AgentEvent, 0, len(d.sseConns))
 	for ch := range d.sseConns {
 		chans = append(chans, ch)
 	}
 	d.mu.Unlock()
 
-	// Non-blocking broadcast
 	for _, ch := range chans {
 		select {
 		case ch <- evt:
-		default: // drop if slow
+		default:
 		}
 	}
 }
 
-// GetAgents returns current state of all agents.
 func (d *Dashboard) GetAgents() []AgentActivity {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -168,16 +162,11 @@ func (d *Dashboard) GetAgents() []AgentActivity {
 	return agents
 }
 
-// ---------------------------------------------------------------------------
-// HTTP Handlers
-// ---------------------------------------------------------------------------
-
 func (d *Dashboard) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /dashboard", d.handleDashboardUI)
 	mux.HandleFunc("GET /dashboard/agents", d.handleAgents)
 	mux.HandleFunc("GET /dashboard/events", d.handleSSE)
 
-	// Serve static assets (CSS, JS) from embedded filesystem
 	sub, _ := fs.Sub(dashboardFS, "dashboard")
 	mux.Handle("GET /dashboard/", http.StripPrefix("/dashboard/", http.FileServer(http.FS(sub))))
 }
@@ -208,7 +197,6 @@ func (d *Dashboard) handleSSE(w http.ResponseWriter, r *http.Request) {
 		d.mu.Unlock()
 	}()
 
-	// Send current agent state as initial event
 	agents := d.GetAgents()
 	data, _ := json.Marshal(agents)
 	fmt.Fprintf(w, "event: init\ndata: %s\n\n", data)
@@ -232,14 +220,8 @@ func (d *Dashboard) handleDashboardUI(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// ---------------------------------------------------------------------------
-// Tracking Middleware — extracts agent ID from header or query
-// ---------------------------------------------------------------------------
-
-// EventObserver receives agent events for additional processing (e.g. profile tracking).
 type EventObserver func(evt AgentEvent)
 
-// extractAgentID reads the agent identifier from X-Agent-Id header or agentId query param.
 func extractAgentID(r *http.Request) string {
 	if id := r.Header.Get("X-Agent-Id"); id != "" {
 		return id
@@ -250,7 +232,6 @@ func extractAgentID(r *http.Request) string {
 	return "anonymous"
 }
 
-// extractProfile reads the profile name from X-Profile header or profile query param.
 func extractProfile(r *http.Request) string {
 	if p := r.Header.Get("X-Profile"); p != "" {
 		return p
@@ -258,7 +239,6 @@ func extractProfile(r *http.Request) string {
 	return r.URL.Query().Get("profile")
 }
 
-// isManagementRoute returns true for routes that shouldn't be tracked in the activity feed.
 func isManagementRoute(path string) bool {
 	return strings.HasPrefix(path, "/dashboard") ||
 		strings.HasPrefix(path, "/profiles") ||
@@ -267,7 +247,6 @@ func isManagementRoute(path string) bool {
 		path == "/welcome" || path == "/favicon.ico" || path == "/health"
 }
 
-// actionDetail extracts a human-readable detail string from the request.
 func actionDetail(r *http.Request) string {
 	switch r.URL.Path {
 	case "/navigate":
@@ -313,5 +292,3 @@ func (d *Dashboard) TrackingMiddleware(observers []EventObserver, next http.Hand
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
