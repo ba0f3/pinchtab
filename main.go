@@ -61,6 +61,7 @@ func main() {
 	defer allocCancel()
 
 	stealthSeed := rand.Intn(1000000000)
+	SetHumanRandSeed(int64(stealthSeed))
 	seededScript := fmt.Sprintf("var __pinchtab_seed = %d;\nvar __pinchtab_stealth_level = %q;\n", stealthSeed, cfg.StealthLevel) + stealthScript
 	bridge.stealthScript = seededScript
 	bridge.allocCtx = allocCtx
