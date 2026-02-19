@@ -4,13 +4,12 @@ let profilesInterval = null;
 
 function switchView(view) {
   document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector('[data-view="' + view + '"]').classList.add('active');
+  const btn = document.querySelector('[data-view="' + view + '"]');
+  if (btn) btn.classList.add('active');
   document.getElementById('feed-view').style.display = view === 'feed' ? 'flex' : 'none';
   document.getElementById('profiles-view').style.display = view === 'profiles' ? 'flex' : 'none';
-  document.getElementById('live-view').style.display = view === 'live' ? 'flex' : 'none';
   document.getElementById('settings-view').style.display = view === 'settings' ? 'block' : 'none';
 
-  if (view === 'live') refreshTabs();
   if (view === 'profiles') loadProfiles();
   if (view === 'settings') loadSettings();
 
@@ -25,3 +24,4 @@ function openInstanceDirect(port) {
 }
 
 connect();
+switchView('profiles');

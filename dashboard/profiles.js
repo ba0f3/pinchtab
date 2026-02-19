@@ -1,6 +1,19 @@
 'use strict';
 
 let profilesLoading = false;
+const profileByName = {};
+
+async function fetchJSONOr(url, fallback) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return fallback;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return fallback;
+    return await res.json();
+  } catch (e) {
+    return fallback;
+  }
+}
 
 async function loadProfiles() {
   if (profilesLoading) return;
@@ -12,19 +25,21 @@ async function loadProfiles() {
   }
 
   try {
-    const [profRes, instRes, healthRes, tabsRes] = await Promise.all([
-      fetch('/profiles'),
-      fetch('/instances'),
-      fetch('/health'),
-      fetch('/tabs')
+    const [profiles, instances, health] = await Promise.all([
+      fetchJSONOr('/profiles', []),
+      fetchJSONOr('/instances', []),
+      fetchJSONOr('/health', {})
     ]);
-    const profiles = await profRes.json() || [];
-    const instances = await instRes.json() || [];
-    const health = await healthRes.json();
-    const tabsData = await tabsRes.json();
+    let tabsData = { tabs: [] };
+    if (!health.mode) {
+      tabsData = await fetchJSONOr('/tabs', { tabs: [] });
+    }
 
-    const running = {};
-    instances.forEach(inst => { if (inst.status === 'running') running[inst.name] = inst; });
+    const instanceByName = {};
+    instances.forEach(inst => { instanceByName[inst.name] = inst; });
+
+    Object.keys(profileByName).forEach(k => { delete profileByName[k]; });
+    profiles.forEach(p => { profileByName[p.name] = p; });
 
     const profileNames = new Set(profiles.map(p => p.name));
     const extraInstances = instances.filter(i => !profileNames.has(i.name));
@@ -37,13 +52,21 @@ async function loadProfiles() {
     }
 
     profiles.forEach(p => {
-      cards.push(renderProfileCard(p.name, p.sizeMB, p.source, running[p.name] || null));
+      cards.push(renderProfileCard(p, instanceByName[p.name] || null));
     });
 
     extraInstances.forEach(inst => {
-      cards.push(renderProfileCard(inst.name, 0, 'instance', inst.status === 'running' ? inst : null));
+      cards.push(renderProfileCard({
+        name: inst.name,
+        sizeMB: 0,
+        source: 'instance'
+      }, inst));
     });
 
+    if (cards.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="crab">🦀</div>No profiles yet.<br>Click <b>+ New Profile</b> to create one.</div>';
+      return;
+    }
     grid.innerHTML = cards.join('');
   } catch (e) {
     console.error('Failed to load profiles', e);
@@ -55,7 +78,7 @@ async function loadProfiles() {
 
 function renderMainCard(tabCount) {
   return `
-    <div class="inst-card" style="border-color:#f5c542">
+    <div class="inst-card" style="border-color:var(--border-active)">
       <div class="inst-header">
         <span class="inst-name">🦀 Main</span>
         <span class="inst-badge running">running :${location.port || '9867'}</span>
@@ -65,19 +88,47 @@ function renderMainCard(tabCount) {
         <div class="inst-row"><span class="label">Port</span><span class="value">${location.port || '9867'}</span></div>
       </div>
       <div class="inst-actions">
-        <button onclick="switchView('live')">📺 Live</button>
-        <button onclick="resetProfile('main')">🔄 Reset</button>
-        <button onclick="viewAnalytics('main')">📊 Analytics</button>
+        <button onclick="viewMainLive()">Live</button>
+        <button class="btn-feed" onclick="viewProfileInfo('main', '')">Info</button>
       </div>
     </div>
   `;
 }
 
-function renderProfileCard(name, sizeMB, source, inst) {
-  const isRunning = inst && inst.status === 'running';
-  const statusBadge = isRunning
-    ? '<span class="inst-badge running">running :' + inst.port + '</span>'
-    : '<span class="inst-badge stopped">stopped</span>';
+function renderProfileCard(profile, inst) {
+  const name = profile.name;
+  const sizeMB = profile.sizeMB;
+  const source = profile.source;
+  const accountText = profile.accountEmail || profile.accountName || '';
+  const accountValue = accountText || '--';
+  const chromeProfileName = profile.chromeProfileName || '';
+  const status = inst ? inst.status : 'stopped';
+  const isRunning = status === 'running';
+  const isError = status === 'error';
+  const tabsValue = (isRunning && inst) ? String(inst.tabCount ?? 0) : '-';
+  const pidValue = (isRunning && inst && inst.pid) ? String(inst.pid) : '-';
+  let statusBadge = '<span class="inst-badge stopped">stopped</span>';
+  if (status === 'running') statusBadge = '<span class="inst-badge running">running :' + inst.port + '</span>';
+  else if (status === 'starting') statusBadge = '<span class="inst-badge starting">starting</span>';
+  else if (status === 'stopping') statusBadge = '<span class="inst-badge stopping">stopping</span>';
+  else if (status === 'error') statusBadge = '<span class="inst-badge error">error</span>';
+
+  let actions = '';
+  if (isRunning) {
+    actions =
+      '<button onclick="viewInstanceLive(\'' + esc(inst.id) + '\', \'' + esc(inst.port) + '\')">Live</button>'
+      + '<button class="btn-feed" onclick="viewProfileInfo(\'' + esc(name) + '\', \'' + esc(inst.id) + '\')">Info</button>'
+      + '<button class="danger" onclick="stopProfile(\'' + esc(name) + '\')">Stop</button>';
+  } else if (inst && (status === 'starting' || status === 'stopping')) {
+    actions =
+      '<button class="btn-feed" onclick="viewProfileInfo(\'' + esc(name) + '\', \'' + esc(inst.id) + '\')">Info</button>'
+      + '<button class="danger" onclick="stopProfile(\'' + esc(name) + '\')">Stop</button>';
+  } else {
+    actions =
+      '<button class="btn-launch" onclick="openLaunchModal(\'' + esc(name) + '\')">Launch</button>'
+      + '<button class="btn-feed" onclick="viewProfileInfo(\'' + esc(name) + '\', \'' + esc(inst ? inst.id : '') + '\')">Info</button>'
+      + '<button class="danger" onclick="deleteProfile(\'' + esc(name) + '\')">Delete</button>';
+  }
 
   return `
     <div class="inst-card">
@@ -88,26 +139,14 @@ function renderProfileCard(name, sizeMB, source, inst) {
       <div class="inst-body">
         <div class="inst-row"><span class="label">Size</span><span class="value">${sizeMB ? sizeMB.toFixed(0) + ' MB' : '—'}</span></div>
         <div class="inst-row"><span class="label">Source</span><span class="value">${esc(source)}</span></div>
-        ${isRunning ? '<div class="inst-row"><span class="label">Mode</span><span class="value">' + (inst.headless ? '🔲 Headless' : '🖥️ Headed') + '</span></div>' : ''}
-        ${isRunning ? '<div class="inst-row"><span class="label">Tabs</span><span class="value">' + inst.tabCount + '</span></div>' : ''}
-        ${isRunning ? '<div class="inst-row"><span class="label">PID</span><span class="value">' + inst.pid + '</span></div>' : ''}
+        ${chromeProfileName ? '<div class="inst-row"><span class="label">Chrome</span><span class="value">' + esc(chromeProfileName) + '</span></div>' : ''}
+        <div class="inst-row"><span class="label">Account</span><span class="value">${esc(accountValue)}</span></div>
+        <div class="inst-row"><span class="label">Tabs</span><span class="value">${tabsValue}</span></div>
+        <div class="inst-row"><span class="label">PID</span><span class="value">${pidValue}</span></div>
+        ${isError && inst && inst.error ? '<div class="inst-row"><span class="label">Error</span><span class="value">' + esc(inst.error) + '</span></div>' : ''}
       </div>
       <div class="inst-actions">
-        ${isRunning
-          ? '<button onclick="viewInstanceLive(\'' + esc(inst.id) + '\', \'' + esc(inst.port) + '\')">📺 Live</button>'
-            + '<button onclick="viewInstanceLogs(\'' + esc(inst.id) + '\')">📄 Logs</button>'
-            + '<button onclick="resetProfile(\'' + esc(name) + '\')">🔄 Reset</button>'
-            + '<button class="danger" onclick="stopInstance(\'' + esc(inst.id) + '\')">⏹ Stop</button>'
-          : (getProfileHeadless(name)
-              ? '<button onclick="launchProfile(\'' + esc(name) + '\')">🚀 Launch</button>'
-                + '<button onclick="launchHeaded(\'' + esc(name) + '\')">🖥️ Headed</button>'
-              : '<button onclick="launchHeaded(\'' + esc(name) + '\')">🖥️ Launch</button>'
-                + '<button onclick="launchProfile(\'' + esc(name) + '\')">🚀 Headless</button>'
-            )
-            + '<button onclick="resetProfile(\'' + esc(name) + '\')">🔄 Reset</button>'
-            + '<button onclick="viewAnalytics(\'' + esc(name) + '\')">📊 Analytics</button>'
-            + '<button class="danger" onclick="deleteProfile(\'' + esc(name) + '\')">🗑️ Delete</button>'
-        }
+        ${actions}
       </div>
     </div>
   `;
@@ -152,47 +191,82 @@ async function doCreateProfile() {
 
 function getProfilePort(name) {
   const saved = localStorage.getItem('pinchtab-port-' + name);
-  if (saved) return saved;
+  if (saved) {
+    if (saved === String(location.port || '9867')) {
+      return String(Number(saved) + 1);
+    }
+    return saved;
+  }
   const cards = document.querySelectorAll('#profiles-grid .inst-card');
   let idx = 0;
   cards.forEach((c, i) => { if (c.querySelector('.inst-name')?.textContent === name) idx = i; });
   return String(9867 + Math.max(idx, 1));
 }
 
-function saveProfilePort(name, port, headless) {
+function saveProfilePort(name, port) {
   localStorage.setItem('pinchtab-port-' + name, port);
-  localStorage.setItem('pinchtab-headless-' + name, headless ? '1' : '0');
 }
 
-function getProfileHeadless(name) {
-  const saved = localStorage.getItem('pinchtab-headless-' + name);
-  if (saved !== null) return saved === '1';
-  return true;
-}
-
-function openLaunchModal(name, headless) {
+function openLaunchModal(name) {
   document.getElementById('launch-name').value = name;
   document.getElementById('launch-port').value = getProfilePort(name);
-  document.getElementById('launch-headless').checked = headless;
+  document.getElementById('launch-profile-path').value = (profileByName[name] && profileByName[name].path) || '';
+  updateLaunchCommand();
   document.getElementById('launch-modal').classList.add('open');
   document.getElementById('launch-port').focus();
 }
-
-function launchProfile(name) { openLaunchModal(name, true); }
-function launchHeaded(name) { openLaunchModal(name, false); }
 
 function closeLaunchModal() {
   document.getElementById('launch-modal').classList.remove('open');
 }
 
+function shellQuote(value) {
+  return '\'' + String(value || '').replace(/'/g, "'\\''") + '\'';
+}
+
+function updateLaunchCommand() {
+  const name = document.getElementById('launch-name').value.trim();
+  const port = document.getElementById('launch-port').value.trim();
+  const profilePathRaw = document.getElementById('launch-profile-path').value.trim();
+  const profilePath = profilePathRaw || '<PROFILE_PATH>';
+  const statePath = profilePath + '/.pinchtab-state';
+  const prefix = profilePathRaw ? '' : '# replace <PROFILE_PATH> first\n';
+  const cmd = '(test -x ./bin/pinchtab || go build -o ./bin/pinchtab .) && '
+    + 'BRIDGE_PORT=' + shellQuote(port || '9868') + ' '
+    + 'BRIDGE_PROFILE=' + shellQuote(profilePath) + ' '
+    + 'BRIDGE_STATE_DIR=' + shellQuote(statePath) + ' '
+    + 'BRIDGE_HEADLESS=false BRIDGE_NO_RESTORE=true BRIDGE_NO_DASHBOARD=true '
+    + './bin/pinchtab';
+  document.getElementById('launch-command').value = prefix + cmd;
+}
+
+async function copyLaunchCommand() {
+  updateLaunchCommand();
+  const el = document.getElementById('launch-command');
+  const text = el.value;
+  try {
+    await navigator.clipboard.writeText(text);
+    await appAlert('Command copied to clipboard.', 'Launch');
+  } catch (e) {
+    el.focus();
+    el.select();
+    document.execCommand('copy');
+    await appAlert('Command copied (fallback).', 'Launch');
+  }
+}
+
 async function doLaunch() {
   const name = document.getElementById('launch-name').value.trim();
   const port = document.getElementById('launch-port').value.trim();
-  const headless = document.getElementById('launch-headless').checked;
+  const headless = false;
 
   if (!name || !port) { await appAlert('Port required'); return; }
+  if (port === String(location.port || '9867')) {
+    await appAlert('Choose a different port than the dashboard port (' + (location.port || '9867') + ').', 'Port in Use');
+    return;
+  }
 
-  saveProfilePort(name, port, headless);
+  saveProfilePort(name, port);
   closeLaunchModal();
 
   try {
@@ -218,29 +292,29 @@ async function deleteProfile(name) {
   loadProfiles();
 }
 
-async function resetProfile(name) {
-  if (!await appConfirm('Reset profile "' + name + '"? This clears session data, cookies, and cache.', '🔄 Reset Profile')) return;
-  await fetch('/profiles/' + name + '/reset', { method: 'POST' });
-  closeModal();
-  loadProfiles();
-}
-
 
 function pollInstanceStatus(id) {
   let attempts = 0;
   const poll = setInterval(async () => {
     attempts++;
-    await loadProfiles();
-    if (attempts > 30) clearInterval(poll);
+    if (attempts > 60) {
+      clearInterval(poll);
+      return;
+    }
     try {
       const res = await fetch('/instances');
       const instances = await res.json();
       const inst = instances.find(i => i.id === id);
       if (inst && (inst.status === 'running' || inst.status === 'error' || inst.status === 'stopped')) {
         clearInterval(poll);
+        if (inst.status === 'error') {
+          await appAlert('Launch failed: ' + (inst.error || 'unknown error'), 'Error');
+        } else if (inst.status === 'stopped') {
+          await appAlert('Launch stopped before ready. Check Logs for details.', 'Launch');
+        }
         loadProfiles();
       }
-    } catch (e) { clearInterval(poll); }
+    } catch (e) {}
   }, 1000);
 }
 
@@ -250,67 +324,88 @@ async function stopInstance(id) {
   setTimeout(loadProfiles, 1000);
 }
 
-async function viewInstanceLogs(id) {
-  const res = await fetch('/instances/' + id + '/logs');
-  const text = await res.text();
-  showModal('📄 Logs: ' + id,
-    '<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:11px;max-height:400px;overflow:auto;color:var(--text-subtle);white-space:pre-wrap">' + esc(text) + '</pre>'
-  );
+async function stopProfile(name) {
+  if (!await appConfirm('Stop profile "' + name + '" gracefully?', '⏹ Stop Profile')) return;
+  const res = await fetch('/profiles/' + encodeURIComponent(name) + '/stop', { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    await appAlert('Stop failed: ' + (data.error || res.statusText), 'Error');
+    return;
+  }
+  setTimeout(loadProfiles, 700);
 }
 
-async function viewAnalytics(name) {
-  let analytics = null;
-  try {
-    const res = await fetch('/profiles/' + name + '/analytics');
-    if (res.ok) analytics = await res.json();
-  } catch (e) {}
+async function viewProfileInfo(name, instanceID) {
+  const encName = encodeURIComponent(name);
+  const [analytics, agents, liveTabs, state] = await Promise.all([
+    fetchJSONOr('/profiles/' + encName + '/analytics', null),
+    fetchJSONOr('/dashboard/agents', []),
+    fetchJSONOr('/instances/tabs', []),
+    fetchJSONOr('/profiles/' + encName + '/instance', null),
+  ]);
 
-  let tabs = [], agentList = [];
-  try {
-    const tabsRes = await fetch('/tabs');
-    const tabsData = await tabsRes.json();
-    tabs = tabsData.tabs || [];
-  } catch (e) {}
-  try {
-    const agentsRes = await fetch('/dashboard/agents');
-    agentList = await agentsRes.json() || [];
-  } catch (e) {}
-
-  let html = '';
-  html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">LIVE STATUS</h4>';
-  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:4px">Tabs open: <span style="color:var(--text)">' + tabs.length + '</span></div>';
-  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:12px">Agents seen: <span style="color:var(--text)">' + agentList.length + '</span></div>';
-
-  if (agentList.length > 0) {
-    html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">AGENTS</h4>';
-    agentList.forEach(a => {
-      html += '<div style="font-size:12px;color:var(--text-subtle);padding:3px 0;display:flex;justify-content:space-between">';
-      html += '<span style="color:var(--primary);font-weight:600">' + esc(a.agentId) + '</span>';
-      html += '<span>' + a.actionCount + ' actions — ' + esc(a.lastAction || '') + '</span>';
-      html += '</div>';
-    });
-    html += '<div style="margin-bottom:12px"></div>';
+  const finalInstanceID = instanceID || (state && state.id ? state.id : '');
+  let logsText = '';
+  if (finalInstanceID) {
+    try {
+      const logsRes = await fetch('/instances/' + encodeURIComponent(finalInstanceID) + '/logs');
+      logsText = logsRes.ok ? await logsRes.text() : '';
+    } catch (e) {
+      logsText = '';
+    }
   }
 
+  const tabsCount = Array.isArray(liveTabs)
+    ? (name === 'main' ? liveTabs.length : liveTabs.filter(t => t.instanceName === name).length)
+    : 0;
+  const agentsForProfile = Array.isArray(agents)
+    ? agents.filter(a => a.profile === name)
+    : [];
+  const status = state && state.status ? state.status : 'stopped';
+  const port = state && state.port ? state.port : '-';
+  const pid = state && state.pid ? state.pid : '-';
+
+  let html = '';
+  html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">STATUS</h4>';
+  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:4px">State: <span style="color:var(--text)">' + esc(status) + '</span></div>';
+  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:4px">Port: <span style="color:var(--text)">' + esc(String(port)) + '</span></div>';
+  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:12px">PID: <span style="color:var(--text)">' + esc(String(pid)) + '</span></div>';
+
+  html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">LIVE</h4>';
+  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:4px">Tabs open: <span style="color:var(--text)">' + tabsCount + '</span></div>';
+  html += '<div style="font-size:13px;color:var(--text-subtle);margin-bottom:12px">Agents: <span style="color:var(--text)">' + agentsForProfile.length + '</span></div>';
+
   if (analytics && analytics.totalActions > 0) {
-    html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">TRACKED (' + analytics.totalActions + ' actions)</h4>';
+    html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">FEED (' + analytics.totalActions + ' actions)</h4>';
     if (analytics.topEndpoints) {
       analytics.topEndpoints.forEach(e => {
-        html += '<div style="font-size:12px;color:var(--text-subtle);padding:2px 0">' + esc(e.endpoint) + ' — ' + e.count + 'x, avg ' + e.avgMs + 'ms</div>';
+        html += '<div style="font-size:12px;color:var(--text-subtle);padding:2px 0">' + esc(e.endpoint) + ' - ' + e.count + 'x, avg ' + e.avgMs + 'ms</div>';
       });
     }
     if (analytics.suggestions) {
       html += '<div style="margin-top:8px">';
       analytics.suggestions.forEach(s => {
-        html += '<p style="color:var(--primary);font-size:12px;margin-bottom:4px">💡 ' + esc(s) + '</p>';
+        html += '<p style="color:var(--text-bright);font-size:12px;margin-bottom:4px">' + esc(s) + '</p>';
       });
       html += '</div>';
     }
   } else {
-    html += '<p style="color:var(--text-faint);font-size:12px">No tracked actions yet. Agents need to send <code style="color:var(--text-muted)">X-Profile</code> header to track per-profile analytics.</p>';
+    html += '<p style="color:var(--text-faint);font-size:12px;margin-bottom:12px">No tracked actions yet.</p>';
   }
 
-  showModal('📊 Analytics: ' + name, html);
+  html += '<h4 style="color:var(--text-muted);font-size:12px;margin-bottom:8px">LOGS</h4>';
+  if (!logsText) {
+    html += '<p style="color:var(--text-faint);font-size:12px">No instance logs available for this profile.</p>';
+  } else {
+    html += '<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:11px;max-height:45vh;overflow:auto;color:var(--text-subtle);white-space:pre-wrap">' + esc(logsText) + '</pre>';
+  }
+
+  showModal('INFO: ' + name, html, null, { wide: true });
+}
+
+const launchPortInput = document.getElementById('launch-port');
+if (launchPortInput) {
+  launchPortInput.addEventListener('input', updateLaunchCommand);
 }
 
 document.getElementById('modal').addEventListener('click', (e) => {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -19,11 +20,15 @@ type ProfileManager struct {
 }
 
 type ProfileInfo struct {
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	CreatedAt time.Time `json:"createdAt"`
-	SizeMB    float64   `json:"sizeMB"`
-	Source    string    `json:"source,omitempty"`
+	Name              string    `json:"name"`
+	Path              string    `json:"path"`
+	CreatedAt         time.Time `json:"createdAt"`
+	SizeMB            float64   `json:"sizeMB"`
+	Source            string    `json:"source,omitempty"`
+	ChromeProfileName string    `json:"chromeProfileName,omitempty"`
+	AccountEmail      string    `json:"accountEmail,omitempty"`
+	AccountName       string    `json:"accountName,omitempty"`
+	HasAccount        bool      `json:"hasAccount,omitempty"`
 }
 
 func NewProfileManager(baseDir string) *ProfileManager {
@@ -76,12 +81,18 @@ func (pm *ProfileManager) profileInfo(name string) (ProfileInfo, error) {
 		source = "imported"
 	}
 
+	chromeProfileName, accountEmail, accountName, hasAccount := readChromeProfileIdentity(dir)
+
 	return ProfileInfo{
-		Name:      name,
-		Path:      dir,
-		CreatedAt: fi.ModTime(),
-		SizeMB:    size,
-		Source:    source,
+		Name:              name,
+		Path:              dir,
+		CreatedAt:         fi.ModTime(),
+		SizeMB:            size,
+		Source:            source,
+		ChromeProfileName: chromeProfileName,
+		AccountEmail:      accountEmail,
+		AccountName:       accountName,
+		HasAccount:        hasAccount,
 	}, nil
 }
 
@@ -195,4 +206,92 @@ func dirSizeMB(path string) float64 {
 		return nil
 	})
 	return float64(total) / (1024 * 1024)
+}
+
+func readChromeProfileIdentity(profileRoot string) (string, string, string, bool) {
+	chromeProfileName, lsEmail, lsName, lsHas := readLocalStateIdentity(filepath.Join(profileRoot, "Local State"))
+	prefsEmail, prefsName, prefsHas := readPreferencesIdentity(filepath.Join(profileRoot, "Default", "Preferences"))
+
+	email := prefsEmail
+	if email == "" {
+		email = lsEmail
+	}
+
+	accountName := prefsName
+	if accountName == "" {
+		accountName = lsName
+	}
+
+	hasAccount := prefsHas || lsHas || email != ""
+	return chromeProfileName, email, accountName, hasAccount
+}
+
+func readPreferencesIdentity(path string) (string, string, bool) {
+	var prefs struct {
+		AccountInfo []struct {
+			Email    string `json:"email"`
+			FullName string `json:"full_name"`
+			GaiaName string `json:"gaia_name"`
+			GaiaID   string `json:"gaia"`
+		} `json:"account_info"`
+	}
+	if !readJSON(path, &prefs) {
+		return "", "", false
+	}
+
+	for _, account := range prefs.AccountInfo {
+		email := account.Email
+		name := account.FullName
+		if name == "" {
+			name = account.GaiaName
+		}
+		if email != "" || account.GaiaID != "" || name != "" {
+			return email, name, true
+		}
+	}
+
+	return "", "", false
+}
+
+func readLocalStateIdentity(path string) (string, string, string, bool) {
+	var state struct {
+		Profile struct {
+			InfoCache map[string]struct {
+				Name                       string `json:"name"`
+				UserName                   string `json:"user_name"`
+				GaiaName                   string `json:"gaia_name"`
+				GaiaID                     string `json:"gaia_id"`
+				IsConsentedPrimaryAccount  bool   `json:"is_consented_primary_account"`
+				HasConsentedPrimaryAccount bool   `json:"has_consented_primary_account"`
+			} `json:"info_cache"`
+		} `json:"profile"`
+	}
+	if !readJSON(path, &state) || len(state.Profile.InfoCache) == 0 {
+		return "", "", "", false
+	}
+
+	entry, ok := state.Profile.InfoCache["Default"]
+	if !ok {
+		for _, v := range state.Profile.InfoCache {
+			entry = v
+			break
+		}
+	}
+
+	profileName := entry.Name
+	email := entry.UserName
+	accountName := entry.GaiaName
+	hasAccount := email != "" || entry.GaiaID != "" || entry.IsConsentedPrimaryAccount || entry.HasConsentedPrimaryAccount
+	return profileName, email, accountName, hasAccount
+}
+
+func readJSON(path string, out any) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	if err := json.Unmarshal(data, out); err != nil {
+		return false
+	}
+	return true
 }

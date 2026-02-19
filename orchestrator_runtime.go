@@ -5,12 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
+)
+
+const (
+	instanceHealthPollInterval = 500 * time.Millisecond
+	instanceStartupTimeout     = 45 * time.Second
 )
 
 func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, error) {
@@ -18,9 +27,15 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 	defer o.mu.Unlock()
 
 	for _, inst := range o.instances {
-		if inst.Port == port && inst.Status == "running" {
+		if inst.Port == port && instanceIsActive(inst) {
 			return nil, fmt.Errorf("port %s already in use by instance %q", port, inst.Name)
 		}
+		if inst.Name == name && instanceIsActive(inst) {
+			return nil, fmt.Errorf("profile %q already has an active instance (%s)", name, inst.Status)
+		}
+	}
+	if !isPortAvailable(port) {
+		return nil, fmt.Errorf("port %s is already in use on this machine", port)
 	}
 
 	id := fmt.Sprintf("%s-%s", name, port)
@@ -30,6 +45,8 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 
 	profilePath := filepath.Join(o.baseDir, name)
 	os.MkdirAll(filepath.Join(profilePath, "Default"), 0755)
+	instanceStateDir := filepath.Join(profilePath, ".pinchtab-state")
+	os.MkdirAll(instanceStateDir, 0755)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -39,13 +56,15 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 	}
 
 	cmd := exec.CommandContext(ctx, o.binary)
-	cmd.Env = append(os.Environ(),
-		"BRIDGE_PORT="+port,
-		"BRIDGE_PROFILE="+profilePath,
-		"BRIDGE_HEADLESS="+headlessStr,
-		"BRIDGE_NO_RESTORE=true",
-		"BRIDGE_NO_DASHBOARD=true",
-	)
+	cmd.Env = mergeEnvWithOverrides(os.Environ(), map[string]string{
+		"BRIDGE_PORT":         port,
+		"BRIDGE_PROFILE":      profilePath,
+		"BRIDGE_STATE_DIR":    instanceStateDir,
+		"BRIDGE_HEADLESS":     headlessStr,
+		"BRIDGE_NO_RESTORE":   "true",
+		"BRIDGE_NO_DASHBOARD": "true",
+	})
+	slog.Info("starting instance process", "id", id, "binary", o.binary, "port", port, "profile", profilePath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	logBuf := newRingBuffer(64 * 1024)
@@ -81,35 +100,85 @@ func (o *Orchestrator) Launch(name, port string, headless bool) (*Instance, erro
 
 func (o *Orchestrator) monitor(inst *Instance) {
 	healthy := false
-	for i := 0; i < 30; i++ {
-		time.Sleep(500 * time.Millisecond)
-		resp, err := o.client.Get(inst.URL + "/health")
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == 200 {
-				healthy = true
-				break
+	exitedEarly := false
+	lastProbe := "no response"
+	resolvedURL := ""
+	waitCh := make(chan error, 1)
+	go func() {
+		waitCh <- inst.cmd.Wait()
+	}()
+	var waitErr error
+	started := time.Now()
+	for time.Since(started) < instanceStartupTimeout {
+		select {
+		case waitErr = <-waitCh:
+			exitedEarly = true
+		default:
+		}
+		if exitedEarly {
+			break
+		}
+		time.Sleep(instanceHealthPollInterval)
+
+		for _, baseURL := range instanceBaseURLs(inst.Port) {
+			resp, err := o.client.Get(baseURL + "/health")
+			if err == nil {
+				resp.Body.Close()
+				lastProbe = fmt.Sprintf("%s -> HTTP %d", baseURL, resp.StatusCode)
+				if isInstanceHealthyStatus(resp.StatusCode) {
+					healthy = true
+					resolvedURL = baseURL
+					break
+				}
+			} else {
+				lastProbe = fmt.Sprintf("%s -> %s", baseURL, err.Error())
 			}
+		}
+		if healthy {
+			break
 		}
 	}
 
 	o.mu.Lock()
-	if healthy {
-		inst.Status = "running"
-		slog.Info("instance ready", "id", inst.ID, "port", inst.Port)
-	} else {
-		inst.Status = "error"
-		inst.Error = "health check timeout after 15s"
-		slog.Error("instance failed to start", "id", inst.ID)
+	switch inst.Status {
+	case "stopping", "stopped":
+	default:
+		if healthy {
+			inst.Status = "running"
+			if resolvedURL != "" {
+				inst.URL = resolvedURL
+			}
+			slog.Info("instance ready", "id", inst.ID, "port", inst.Port)
+		} else if exitedEarly {
+			inst.Status = "error"
+			if waitErr != nil {
+				inst.Error = "process exited before health check: " + waitErr.Error()
+			} else {
+				inst.Error = "process exited before health check succeeded"
+			}
+			if tail := tailLogLine(inst.logBuf.String()); tail != "" {
+				inst.Error += " | " + tail
+			}
+			slog.Error("instance exited before ready", "id", inst.ID)
+		} else {
+			inst.Status = "error"
+			inst.Error = fmt.Sprintf("health check timeout after %s (%s)", instanceStartupTimeout, lastProbe)
+			if tail := tailLogLine(inst.logBuf.String()); tail != "" {
+				inst.Error += " | " + tail
+			}
+			slog.Error("instance failed to start", "id", inst.ID)
+		}
 	}
 	o.mu.Unlock()
 
-	err := inst.cmd.Wait()
+	if !exitedEarly {
+		waitErr = <-waitCh
+	}
 	o.mu.Lock()
-	if inst.Status != "stopped" {
+	if inst.Status == "running" || inst.Status == "stopping" {
 		inst.Status = "stopped"
-		if err != nil {
-			inst.Error = err.Error()
+		if waitErr != nil {
+			inst.Error = waitErr.Error()
 		}
 	}
 	o.mu.Unlock()
@@ -123,22 +192,127 @@ func (o *Orchestrator) Stop(id string) error {
 		o.mu.Unlock()
 		return fmt.Errorf("instance %q not found", id)
 	}
-	inst.Status = "stopped"
+	if inst.Status == "stopped" && !instanceIsActive(inst) {
+		o.mu.Unlock()
+		return nil
+	}
+	inst.Status = "stopping"
 	o.mu.Unlock()
 
-	req, _ := http.NewRequest("POST", inst.URL+"/shutdown", nil)
+	if inst.cmd == nil || inst.cmd.Process == nil {
+		o.markStopped(id)
+		return nil
+	}
+	if inst.PID <= 0 {
+		inst.cancel()
+		o.markStopped(id)
+		return nil
+	}
+
+	reqCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(reqCtx, http.MethodPost, inst.URL+"/shutdown", nil)
 	resp, err := o.client.Do(req)
 	if err == nil {
 		resp.Body.Close()
-		time.Sleep(2 * time.Second)
 	}
 
-	if inst.cmd.ProcessState == nil || !inst.cmd.ProcessState.Exited() {
-		_ = syscall.Kill(-inst.cmd.Process.Pid, syscall.SIGKILL)
-		inst.cancel()
+	if waitForProcessExit(inst.PID, 5*time.Second) {
+		o.markStopped(id)
+		return nil
 	}
 
+	if err := syscall.Kill(-inst.PID, syscall.SIGTERM); err != nil {
+		slog.Warn("failed to send SIGTERM to instance", "id", id, "pid", inst.PID, "err", err)
+	}
+	if waitForProcessExit(inst.PID, 3*time.Second) {
+		o.markStopped(id)
+		return nil
+	}
+
+	if err := syscall.Kill(-inst.PID, syscall.SIGKILL); err != nil {
+		slog.Warn("failed to send SIGKILL to instance", "id", id, "pid", inst.PID, "err", err)
+	}
+	inst.cancel()
+	if waitForProcessExit(inst.PID, 2*time.Second) {
+		o.markStopped(id)
+		return nil
+	}
+
+	o.setStopError(id, fmt.Sprintf("failed to stop process %d; still running", inst.PID))
+	return fmt.Errorf("failed to stop instance %q gracefully", id)
+}
+
+func (o *Orchestrator) StopProfile(name string) error {
+	o.mu.RLock()
+	ids := make([]string, 0, 1)
+	for id, inst := range o.instances {
+		if inst.Name == name && instanceIsActive(inst) {
+			ids = append(ids, id)
+		}
+	}
+	o.mu.RUnlock()
+
+	if len(ids) == 0 {
+		return fmt.Errorf("no active instance for profile %q", name)
+	}
+
+	var errs []string
+	for _, id := range ids {
+		if err := o.Stop(id); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to stop profile %q: %s", name, strings.Join(errs, "; "))
+	}
 	return nil
+}
+
+func (o *Orchestrator) markStopped(id string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if inst, ok := o.instances[id]; ok {
+		inst.Status = "stopped"
+	}
+}
+
+func (o *Orchestrator) setStopError(id, msg string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if inst, ok := o.instances[id]; ok {
+		inst.Status = "error"
+		inst.Error = msg
+	}
+}
+
+func instanceIsActive(inst *Instance) bool {
+	if inst == nil {
+		return false
+	}
+	if inst.PID > 0 {
+		return isProcessAlive(inst.PID)
+	}
+	return inst.Status == "starting" || inst.Status == "running" || inst.Status == "stopping"
+}
+
+func waitForProcessExit(pid int, timeout time.Duration) bool {
+	if pid <= 0 {
+		return true
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !isProcessAlive(pid) {
+			return true
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+	return !isProcessAlive(pid)
+}
+
+func isProcessAlive(pid int) bool {
+	err := syscall.Kill(pid, syscall.Signal(0))
+	return err == nil || err == syscall.EPERM
 }
 
 func (o *Orchestrator) List() []Instance {
@@ -151,11 +325,12 @@ func (o *Orchestrator) List() []Instance {
 		copyInst.cmd = nil
 		copyInst.cancel = nil
 		copyInst.logBuf = nil
-
-		if inst.Status == "running" {
-			if tabs, err := o.fetchTabs(inst.URL); err == nil {
-				copyInst.TabCount = len(tabs)
-			}
+		if instanceIsActive(inst) && copyInst.Status == "stopped" {
+			copyInst.Status = "running"
+		}
+		if !instanceIsActive(inst) &&
+			(copyInst.Status == "starting" || copyInst.Status == "running" || copyInst.Status == "stopping") {
+			copyInst.Status = "stopped"
 		}
 
 		result = append(result, copyInst)
@@ -174,11 +349,22 @@ func (o *Orchestrator) Logs(id string) (string, error) {
 	return inst.logBuf.String(), nil
 }
 
+func (o *Orchestrator) FirstRunningURL() string {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	for _, inst := range o.instances {
+		if inst.Status == "running" && instanceIsActive(inst) {
+			return inst.URL
+		}
+	}
+	return ""
+}
+
 func (o *Orchestrator) AllTabs() []instanceTab {
 	o.mu.RLock()
 	instances := make([]*Instance, 0)
 	for _, inst := range o.instances {
-		if inst.Status == "running" {
+		if inst.Status == "running" && instanceIsActive(inst) {
 			instances = append(instances, inst)
 		}
 	}
@@ -244,14 +430,107 @@ func (o *Orchestrator) Shutdown() {
 	o.mu.RLock()
 	ids := make([]string, 0, len(o.instances))
 	for id, inst := range o.instances {
-		if inst.Status == "running" {
+		if instanceIsActive(inst) {
 			ids = append(ids, id)
 		}
 	}
 	o.mu.RUnlock()
 
+	var wg sync.WaitGroup
 	for _, id := range ids {
-		slog.Info("stopping instance", "id", id)
-		o.Stop(id)
+		wg.Add(1)
+		go func(instanceID string) {
+			defer wg.Done()
+			slog.Info("stopping instance", "id", instanceID)
+			if err := o.Stop(instanceID); err != nil {
+				slog.Warn("stop instance failed", "id", instanceID, "err", err)
+			}
+		}(id)
 	}
+	wg.Wait()
+}
+
+func isPortAvailable(port string) bool {
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
+}
+
+func (o *Orchestrator) ForceShutdown() {
+	o.mu.RLock()
+	instances := make([]*Instance, 0, len(o.instances))
+	for _, inst := range o.instances {
+		if instanceIsActive(inst) {
+			instances = append(instances, inst)
+		}
+	}
+	o.mu.RUnlock()
+
+	for _, inst := range instances {
+		if inst.PID > 0 {
+			_ = syscall.Kill(-inst.PID, syscall.SIGKILL)
+		}
+		if inst.cancel != nil {
+			inst.cancel()
+		}
+		o.markStopped(inst.ID)
+	}
+}
+
+func isInstanceHealthyStatus(code int) bool {
+	return code > 0 && code < http.StatusInternalServerError
+}
+
+func instanceBaseURLs(port string) []string {
+	return []string{
+		fmt.Sprintf("http://127.0.0.1:%s", port),
+		fmt.Sprintf("http://[::1]:%s", port),
+		fmt.Sprintf("http://localhost:%s", port),
+	}
+}
+
+func tailLogLine(logs string) string {
+	if logs == "" {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(logs), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		const max = 220
+		if len(line) > max {
+			return line[len(line)-max:]
+		}
+		return line
+	}
+	return ""
+}
+
+func mergeEnvWithOverrides(base []string, overrides map[string]string) []string {
+	out := make([]string, 0, len(base)+len(overrides))
+	for _, kv := range base {
+		key, _, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		if _, exists := overrides[key]; exists {
+			continue
+		}
+		out = append(out, kv)
+	}
+
+	keys := make([]string, 0, len(overrides))
+	for k := range overrides {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		out = append(out, k+"="+overrides[k])
+	}
+	return out
 }

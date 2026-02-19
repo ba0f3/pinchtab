@@ -66,32 +66,27 @@ func (rb *ringBuffer) String() string {
 func NewOrchestrator(baseDir string) *Orchestrator {
 	binDir := filepath.Join(filepath.Dir(baseDir), "bin")
 	stableBin := filepath.Join(binDir, "pinchtab")
+	exe, _ := os.Executable()
+	binary := exe
+	if binary == "" {
+		binary = os.Args[0]
+	}
 
-	needsBuild := true
-	if fi, err := os.Stat(stableBin); err == nil {
-		if time.Since(fi.ModTime()) < time.Hour {
-			needsBuild = false
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		slog.Warn("failed to create bin directory", "path", binDir, "err", err)
+	}
+
+	if exe != "" {
+		if err := installStableBinary(exe, stableBin); err != nil {
+			slog.Warn("failed to install pinchtab binary", "path", stableBin, "err", err)
+		} else {
+			slog.Info("installed pinchtab binary", "path", stableBin)
 		}
 	}
 
-	if needsBuild {
-		os.MkdirAll(binDir, 0755)
-
-		exe, _ := os.Executable()
-		if exe != "" {
-			if data, err := os.ReadFile(exe); err == nil {
-				if err := os.WriteFile(stableBin, data, 0755); err == nil {
-					slog.Info("installed pinchtab binary", "path", stableBin)
-				}
-			}
-		}
-	}
-
-	binary := stableBin
 	if _, err := os.Stat(binary); err != nil {
-		binary, _ = os.Executable()
-		if binary == "" {
-			binary = os.Args[0]
+		if _, stableErr := os.Stat(stableBin); stableErr == nil {
+			binary = stableBin
 		}
 	}
 
@@ -101,4 +96,12 @@ func NewOrchestrator(baseDir string) *Orchestrator {
 		binary:    binary,
 		client:    &http.Client{Timeout: 3 * time.Second},
 	}
+}
+
+func installStableBinary(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0755)
 }

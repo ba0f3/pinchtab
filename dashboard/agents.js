@@ -80,7 +80,7 @@ function renderFeed() {
   }
 
   if (filtered.length === 0) {
-    el.innerHTML = '<div class="empty-state"><div class="crab">🦀</div>No matching events.</div>';
+    el.innerHTML = '<div class="empty-state"><img src="/dashboard/pinchtab-headed-192.png" alt="" class="empty-icon">No matching events.</div>';
     return;
   }
 

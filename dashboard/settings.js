@@ -56,7 +56,7 @@ async function applySettings() {
   Object.values(screencastSockets).forEach(s => s.close());
   Object.keys(screencastSockets).forEach(k => delete screencastSockets[k]);
 
-  await appAlert('Settings saved. Switch to Live view to see changes.', '⚙️ Settings');
+  await appAlert('Settings saved.', '⚙️ Settings');
 }
 
 async function applyStealth() {

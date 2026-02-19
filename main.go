@@ -312,10 +312,17 @@ func main() {
 	mux.HandleFunc("POST /shutdown", bridge.handleShutdown(doShutdown))
 
 	go func() {
-		sig := make(chan os.Signal, 1)
+		sig := make(chan os.Signal, 2)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		<-sig
-		doShutdown()
+		go doShutdown()
+		<-sig
+		slog.Warn("force shutdown requested")
+		orchestrator.ForceShutdown()
+		cleanupCancel()
+		browserCancel()
+		allocCancel()
+		os.Exit(130)
 	}()
 
 	slog.Info("🦀 PINCH! PINCH!", "port", port, "cdp", cdpURL, "stealth", stealthLevel)

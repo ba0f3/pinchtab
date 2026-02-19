@@ -159,12 +159,13 @@ func (d *Dashboard) GetAgents() []AgentActivity {
 }
 
 func (d *Dashboard) RegisterHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("GET /dashboard", d.handleDashboardUI)
+	mux.Handle("GET /dashboard", d.withNoCache(http.HandlerFunc(d.handleDashboardUI)))
 	mux.HandleFunc("GET /dashboard/agents", d.handleAgents)
 	mux.HandleFunc("GET /dashboard/events", d.handleSSE)
 
 	sub, _ := fs.Sub(dashboardFS, "dashboard")
-	mux.Handle("GET /dashboard/", http.StripPrefix("/dashboard/", http.FileServer(http.FS(sub))))
+	static := http.StripPrefix("/dashboard/", http.FileServer(http.FS(sub)))
+	mux.Handle("GET /dashboard/", d.withNoCache(static))
 }
 
 func (d *Dashboard) handleAgents(w http.ResponseWriter, r *http.Request) {
@@ -212,8 +213,20 @@ func (d *Dashboard) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleDashboardUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	data, _ := dashboardFS.ReadFile("dashboard/dashboard.html")
 	w.Write(data)
+}
+
+func (d *Dashboard) withNoCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next.ServeHTTP(w, r)
+	})
 }
 
 type EventObserver func(evt AgentEvent)

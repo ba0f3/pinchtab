@@ -1,5 +1,7 @@
 'use strict';
 
+let modalCloseHook = null;
+
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
@@ -46,11 +48,32 @@ function appAlert(message, title) {
 }
 
 function closeModal() {
-  document.getElementById('modal').classList.remove('open');
+  const overlay = document.getElementById('modal');
+  if (modalCloseHook) {
+    const hook = modalCloseHook;
+    modalCloseHook = null;
+    try { hook(); } catch (e) {}
+  }
+  overlay.classList.remove('open');
+  const dialog = overlay.querySelector('.modal');
+  if (dialog) dialog.classList.remove('modal-wide');
 }
 
-function showModal(title, bodyHtml, buttons) {
+function showModal(title, bodyHtml, buttons, options) {
+  if (modalCloseHook) {
+    const hook = modalCloseHook;
+    modalCloseHook = null;
+    try { hook(); } catch (e) {}
+  }
   const modal = document.getElementById('modal');
+  const dialog = modal.querySelector('.modal');
+  if (dialog) {
+    dialog.classList.remove('modal-wide');
+    if (options && options.wide) {
+      dialog.classList.add('modal-wide');
+    }
+  }
+  modalCloseHook = options && typeof options.onClose === 'function' ? options.onClose : null;
   document.getElementById('modal-title').textContent = title;
   let html = bodyHtml;
   if (buttons) {

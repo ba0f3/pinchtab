@@ -12,6 +12,13 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+var crashedPrefsReplacer = strings.NewReplacer(
+	`"exit_type":"Crashed"`, `"exit_type":"Normal"`,
+	`"exit_type": "Crashed"`, `"exit_type": "Normal"`,
+	`"exited_cleanly":false`, `"exited_cleanly":true`,
+	`"exited_cleanly": false`, `"exited_cleanly": true`,
+)
+
 type TabState struct {
 	ID    string `json:"id"`
 	URL   string `json:"url"`
@@ -29,8 +36,7 @@ func markCleanExit() {
 	if err != nil {
 		return
 	}
-	patched := strings.ReplaceAll(string(data), `"exit_type":"Crashed"`, `"exit_type":"Normal"`)
-	patched = strings.ReplaceAll(patched, `"exited_cleanly":false`, `"exited_cleanly":true`)
+	patched := crashedPrefsReplacer.Replace(string(data))
 	if patched != string(data) {
 		if err := os.WriteFile(prefsPath, []byte(patched), 0644); err != nil {
 			slog.Error("patch prefs", "err", err)
@@ -44,7 +50,8 @@ func wasUncleanExit() bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(data), `"exit_type":"Crashed"`)
+	prefs := string(data)
+	return strings.Contains(prefs, `"exit_type":"Crashed"`) || strings.Contains(prefs, `"exit_type": "Crashed"`)
 }
 
 func clearChromeSessions() {

@@ -51,15 +51,7 @@ func runDashboard() {
 	for _, ep := range proxyEndpoints {
 		endpoint := ep
 		mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
-
-			instances := orchestrator.List()
-			var target string
-			for _, inst := range instances {
-				if inst.Status == "running" {
-					target = inst.URL
-					break
-				}
-			}
+			target := orchestrator.FirstRunningURL()
 			if target == "" {
 				jsonErr(w, 503, fmt.Errorf("no running instances — launch one from the Profiles tab"))
 				return
@@ -89,19 +81,21 @@ func runDashboard() {
 
 	srv := &http.Server{Addr: ":" + dashPort, Handler: handler}
 
-	defaultProfile := os.Getenv("PINCHTAB_DEFAULT_PROFILE")
-	defaultPort := os.Getenv("PINCHTAB_DEFAULT_PORT")
-	if defaultPort == "" {
-		defaultPort = "9867"
-	}
-	if defaultProfile == "" {
-		defaultProfile = "default"
-	}
-
-	os.MkdirAll(filepath.Join(profilesDir, defaultProfile, "Default"), 0755)
-
-	autoLaunch := os.Getenv("PINCHTAB_NO_AUTO_LAUNCH") == ""
+	autoLaunch := strings.EqualFold(os.Getenv("PINCHTAB_AUTO_LAUNCH"), "1") ||
+		strings.EqualFold(os.Getenv("PINCHTAB_AUTO_LAUNCH"), "true") ||
+		strings.EqualFold(os.Getenv("PINCHTAB_AUTO_LAUNCH"), "yes")
 	if autoLaunch {
+		defaultProfile := os.Getenv("PINCHTAB_DEFAULT_PROFILE")
+		defaultPort := os.Getenv("PINCHTAB_DEFAULT_PORT")
+		if defaultPort == "" {
+			defaultPort = "9867"
+		}
+		if defaultProfile == "" {
+			defaultProfile = "default"
+		}
+
+		os.MkdirAll(filepath.Join(profilesDir, defaultProfile, "Default"), 0755)
+
 		go func() {
 
 			time.Sleep(500 * time.Millisecond)
@@ -113,6 +107,8 @@ func runDashboard() {
 			}
 			slog.Info("auto-launched default instance", "id", inst.ID, "port", defaultPort, "headless", headlessDefault)
 		}()
+	} else {
+		slog.Info("dashboard auto-launch disabled", "hint", "set PINCHTAB_AUTO_LAUNCH=1 to enable")
 	}
 
 	shutdownOnce := &sync.Once{}
@@ -133,10 +129,14 @@ func runDashboard() {
 	})
 
 	go func() {
-		sig := make(chan os.Signal, 1)
+		sig := make(chan os.Signal, 2)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		<-sig
-		doShutdown()
+		go doShutdown()
+		<-sig
+		slog.Warn("force shutdown requested")
+		orchestrator.ForceShutdown()
+		os.Exit(130)
 	}()
 
 	slog.Info("dashboard ready", "url", fmt.Sprintf("http://localhost:%s/dashboard", dashPort))
