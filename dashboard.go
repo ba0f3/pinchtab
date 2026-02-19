@@ -1,9 +1,4 @@
-package // DashboardConfig holds tunable timeouts for agent status transitions.
-// Shutdown stops the reaper goroutine.
-// RecordEvent processes an agent action and broadcasts to SSE subscribers.
-// GetAgents returns current state of all agents.
-// EventObserver receives agent events for additional processing (e.
-main
+package main
 
 import (
 	"context"
@@ -24,6 +19,7 @@ type DashboardConfig struct {
 	SSEBufferSize     int
 }
 
+//go:embed dashboard/*
 var dashboardFS embed.FS
 
 type AgentActivity struct {

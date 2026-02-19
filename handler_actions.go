@@ -1,5 +1,4 @@
-package // ActionFunc handles a single action kind.
-main
+package main
 
 import (
 	"context"

@@ -1,9 +1,4 @@
-package // TabLock represents an active lock held by an agent on a tab.
-// Lock acquires a lock on a tab for the given owner.
-// Unlock releases a lock.
-// Get returns the lock info for a tab, or nil if unlocked/expired.
-// CheckAccess returns an error if the tab is locked by someone other than owner.
-main
+package main
 
 import (
 	"fmt"

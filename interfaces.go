@@ -1,6 +1,4 @@
-package // BridgeAPI is the interface handlers use to interact with Chrome.
-// TabInfo is a simplified tab descriptor for JSON responses.
-main
+package main
 
 import (
 	"context"

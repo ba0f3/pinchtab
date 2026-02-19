@@ -1,8 +1,4 @@
-package // TabState represents a saved tab for session persistence.
-// SessionState is the on-disk format for saved sessions.
-// SaveState writes all open tab URLs to sessions.
-// RestoreState reopens tabs from the last saved session with concurrency limiting.
-main
+package main
 
 import (
 	"context"

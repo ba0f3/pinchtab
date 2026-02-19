@@ -75,6 +75,28 @@ go build -o pinchtab .
 BRIDGE_HEADLESS=true ./pinchtab
 ```
 
+### Run Modes
+
+| Mode | Command | Notes |
+|---|---|---|
+| Headed (default) | `./pinchtab` | Launches managed Chrome with visible window |
+| Headless | `BRIDGE_HEADLESS=true ./pinchtab` | Launches managed Chrome without UI |
+| Remote CDP | `CDP_URL=http://localhost:9222 ./pinchtab` | Connects to an existing Chrome instead of launching one |
+| Dashboard only | `./pinchtab dashboard` | Runs the dashboard/orchestrator entrypoint |
+
+Common runtime options:
+
+```bash
+# Custom port
+BRIDGE_PORT=9870 ./pinchtab
+
+# Custom profile directory
+BRIDGE_PROFILE=/path/to/profile ./pinchtab
+
+# Enable API auth
+BRIDGE_TOKEN=your-secret-token ./pinchtab
+```
+
 ### Headless Mode (recommended)
 
 <img src="assets/pinchtab-headless.png" width="64" alt="Pinchtab" />
@@ -336,4 +358,3 @@ Pinchtab is built to work seamlessly with [OpenClaw](https://openclaw.ai) — th
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date&v=20260219" />
  </picture>
 </a>
-

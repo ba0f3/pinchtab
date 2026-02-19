@@ -146,6 +146,7 @@ if (window.RTCPeerConnection) {
   window.RTCPeerConnection.prototype = originalRTCPeerConnection.prototype;
 }
 
+}
 
 const __pinchtab_origGetTimezoneOffset = Date.prototype.getTimezoneOffset;
 Object.defineProperty(Date.prototype, 'getTimezoneOffset', {

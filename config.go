@@ -1,5 +1,4 @@
-package // Config represents the configuration file structure.
-main
+package main
 
 import (
 	_ "embed"
@@ -35,10 +34,13 @@ const (
 	tabActionClose = "close"
 )
 
+//go:embed stealth.js
 var stealthScript string
 
+//go:embed readability.js
 var readabilityJS string
 
+//go:embed welcome.html
 var welcomeHTML string
 
 var (

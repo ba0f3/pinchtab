@@ -1,5 +1,4 @@
-package // A11yNode is a flattened accessibility tree node returned by /snapshot.
-main
+package main
 
 import (
 	"encoding/json"

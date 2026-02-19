@@ -33,7 +33,7 @@ func testBridge(t *testing.T) (*Bridge, func()) {
 	browserCtx, browserCancel := chromedp.NewContext(allocCtx)
 
 	seed := rand.Intn(1000000000)
-	seededScript := fmt.Sprintf("var __pinchtab_seed = %d;\n", seed) + stealthScript
+	seededScript := fmt.Sprintf("var __pinchtab_seed = %d;\nvar __pinchtab_stealth_level = %q;\n", seed, "full") + stealthScript
 	if err := chromedp.Run(browserCtx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(seededScript).Do(ctx)

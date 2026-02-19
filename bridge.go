@@ -1,14 +1,4 @@
-package // TabEntry holds a chromedp context for an open tab.
-// Bridge is the central state holder for the Chrome connection, tab contexts, and per-tab snapshot caches.
-// TabContext returns the chromedp context for a tab and the resolved tabID.
-// CleanStaleTabs periodically removes tab entries whose Chrome targets no longer exist.
-// GetRefCache returns the cached snapshot refs for a tab (nil if none).
-// SetRefCache stores the snapshot ref cache for a tab.
-// DeleteRefCache removes the snapshot ref cache for a tab.
-// CreateTab opens a new tab, navigates to url, and returns its ID and context.
-// CloseTab closes a tab by ID and cleans up caches.
-// ListTargets returns all open page targets from Chrome.
-main
+package main
 
 import (
 	"context"
