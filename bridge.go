@@ -19,8 +19,8 @@ type refCache struct {
 }
 
 type Bridge struct {
-	allocCtx      context.Context
-	browserCtx    context.Context
+	allocCtx   context.Context
+	browserCtx context.Context
 	*TabManager
 	stealthScript string
 	actions       map[string]ActionFunc
