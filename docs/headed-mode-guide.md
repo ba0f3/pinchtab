@@ -182,14 +182,124 @@ Each gets its own port, its own Chrome process, its own isolated session. Agents
 
 Headed mode isn't about choosing between humans and agents. It's about letting them work together — each doing what they're best at. Humans handle the messy, contextual, trust-requiring parts. Agents handle the repetitive, fast, scale-requiring parts.
 
+## Monitoring Agents Remotely
+
+Here's where it gets interesting. Your agents are running on a server — a Mac Mini under your desk, a VPS, a home lab box. You're on your laptop, maybe on the couch, maybe in a coffee shop. You want to know what your agents are doing right now.
+
+The dashboard gives you that. Open it in your browser and you get a real-time view of every agent, every profile, every action.
+
+### Setting Up Remote Access
+
+By default, Pinchtab only listens on `127.0.0.1` — locked to the machine. To access the dashboard from another device on your network, you need two things: open the bind address and set an auth token.
+
+```bash
+BRIDGE_BIND=0.0.0.0 BRIDGE_TOKEN=your-secret-token pinchtab dashboard
+```
+
+That's it. Now open `http://<server-ip>:9867/dashboard` from your laptop and you'll see the full dashboard.
+
+Every API call needs the token too:
+
+```bash
+curl http://192.168.1.100:9867/profiles \
+  -H "Authorization: Bearer your-secret-token"
+```
+
+Without the token, every request gets a `401`. No exceptions — health check, profiles, everything.
+
+### What You See
+
+The dashboard has three views:
+
+**Profiles** — your Chrome profiles, their status (running/stopped), account info. Click Details on any profile to get three tabs:
+
+- **Profile** — metadata, status, path, account info
+- **Live** — real-time screencast of what the browser is showing right now. You're literally watching your agent browse. <!-- screenshot: live-tab.png -->
+- **Logs** — open tabs, connected agents, activity stats, instance logs
+
+**Agents** — every agent that's made an API call, across all running profiles. You see their ID, which profile they're using, their last action, and when they were last active. The Activity Feed shows a real-time stream of every navigate, snapshot, and action — filterable by type. <!-- screenshot: agents-view.png -->
+
+**Settings** — screencast quality, stealth level, browser options.
+
+### The Activity Feed
+
+The Activity Feed is the heartbeat of your agent fleet. Every action from every agent across every profile streams in real-time:
+
+```
+mario → POST /navigate (Work) — 23ms
+mario → GET /snapshot (Work) — 145ms  
+scraper → POST /navigate (Research) — 31ms
+scraper → GET /text (Research) — 89ms
+```
+
+Filter by type — just navigations, just snapshots, just actions — to focus on what matters.
+
+This works because the dashboard subscribes to each running child instance's event stream and relays everything through a single SSE connection to your browser. You get one unified view even when agents are spread across multiple profiles on different ports.
+
+### Agent Identification
+
+For agents to show up with a name instead of "anonymous", they just need to pass a header:
+
+```bash
+curl -X POST http://localhost:9868/navigate \
+  -H "X-Agent-Id: mario" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+```
+
+That's all it takes. The `X-Agent-Id` header tags every request, and the dashboard tracks it automatically. No registration, no config — just a header.
+
+### Watching Live
+
+The Live tab in the profile details is a real-time screencast. The dashboard streams JPEG frames from Chrome's DevTools protocol directly to your browser. You see exactly what the agent sees — every page load, every click, every form fill.
+
+This is useful for:
+
+- **Debugging** — why did the agent click the wrong button? Watch it happen.
+- **Trust** — your agent is buying something? Watch it fill in the details before it submits.
+- **Fun** — there's something oddly satisfying about watching an AI browse the web.
+
+The screencast is lightweight — configurable FPS (1-15), quality (10-80%), and max width. Default settings use minimal bandwidth.
+
+### A Typical Remote Monitoring Setup
+
+On your server:
+
+```bash
+# Start the dashboard, open to network, locked with token
+BRIDGE_BIND=0.0.0.0 \
+BRIDGE_TOKEN=my-secret-token \
+pinchtab dashboard &
+
+# Your agents start profiles and work as usual
+# They just pass X-Agent-Id headers so you can identify them
+```
+
+On your laptop, phone, or tablet:
+
+1. Open `http://<server-ip>:9867/dashboard`
+2. See all profiles, their status, running agents
+3. Click into any profile → Live tab to watch the screencast
+4. Switch to Agents view to see the real-time activity feed
+
+No SSH tunnels. No VPN. Just a browser and a token.
+
 ## Security
 
 Pinchtab binds to `127.0.0.1` by default — only accessible from the machine it's running on. This is intentional. Your agent runs on the same machine, so it just works. Nobody on your network can reach the dashboard or the API.
 
-If you need remote access (e.g. Docker, remote server), set `BRIDGE_BIND=0.0.0.0` and **always** pair it with `BRIDGE_TOKEN` for authentication:
+If you need remote access, set `BRIDGE_BIND=0.0.0.0` and **always** pair it with `BRIDGE_TOKEN`:
 
 ```bash
 BRIDGE_BIND=0.0.0.0 BRIDGE_TOKEN=my-secret-token pinchtab dashboard
 ```
+
+Without `BRIDGE_TOKEN`, every request is rejected with `401` — including the dashboard UI itself. There's no "public mode". If you open the bind address, you must set a token. This is by design.
+
+For production setups, consider:
+
+- Running behind a reverse proxy (nginx, Caddy) with HTTPS
+- Using a strong, random token (`openssl rand -hex 32`)
+- Restricting network access with firewall rules
 
 That's the whole point. 🦀
