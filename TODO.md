@@ -27,13 +27,13 @@ tab limit (`BRIDGE_MAX_TABS`, default 20), tab close error on bogus IDs.
 - [ ] **proxy_ws.go proper HTTP** — Replace raw `backend.Write` of HTTP headers with proper request construction.
 - [ ] **humanType global rand** — Accept `*rand.Rand` for reproducible tests.
 - [ ] **Canvas noise in headless** — `TestCanvasNoiseApplied` fails (headless Chrome limitation, `full` stealth only).
-- [ ] **`hardwareConcurrency` redefine warning** — Suppress warning during fingerprint rotation.
+- [x] **`hardwareConcurrency` redefine warning** — Fixed: added `configurable: true` to stealth.js defineProperty.
 
 ---
 
 ## Known Bugs
 
-- **`hardwareConcurrency` redefine warning** — Console warning during fingerprint rotation (cosmetic).
+- ~~**`hardwareConcurrency` redefine warning**~~ — Fixed: `configurable: true` in stealth.js.
 - **Canvas noise in headless** — `toDataURL()` returns identical data in headless Chrome. Only affects `full` stealth mode.
 
 ---
