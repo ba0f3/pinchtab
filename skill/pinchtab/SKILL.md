@@ -36,6 +36,9 @@ metadata:
         - name: BRIDGE_STEALTH
           optional: true
           description: "Stealth level: light (default, basic) or full (canvas/WebGL/font spoofing)"
+        - name: BRIDGE_MAX_TABS
+          optional: true
+          description: "Maximum number of open tabs (default: 20, 0 = unlimited)"
         - name: BRIDGE_BLOCK_IMAGES
           optional: true
           description: "Block image loading for faster, lower-bandwidth browsing (true/false)"
@@ -402,6 +405,7 @@ curl http://localhost:9867/health
 | `BRIDGE_STATE_DIR` | `~/.pinchtab` | State/session storage |
 | `BRIDGE_NO_RESTORE` | `false` | Skip tab restore on startup |
 | `BRIDGE_STEALTH` | `light` | Stealth level: `light` or `full` |
+| `BRIDGE_MAX_TABS` | `20` | Max open tabs (0 = unlimited) |
 | `BRIDGE_BLOCK_IMAGES` | `false` | Block image loading |
 | `BRIDGE_BLOCK_MEDIA` | `false` | Block all media (images + fonts + CSS + video) |
 | `BRIDGE_NO_ANIMATIONS` | `false` | Disable CSS animations/transitions |
