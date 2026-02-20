@@ -25,6 +25,7 @@ func (o *Orchestrator) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /instances/tabs", o.handleAllTabs)
 	mux.HandleFunc("POST /profiles/{name}/stop", o.handleStopProfileByPath)
 	mux.HandleFunc("GET /profiles/{name}/instance", o.handleProfileInstance)
+	mux.HandleFunc("GET /instances/{id}/proxy/screencast", o.handleProxyScreencast)
 }
 
 func (o *Orchestrator) handleLaunch(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +224,22 @@ func (o *Orchestrator) handleProfileInstance(w http.ResponseWriter, r *http.Requ
 		"status":  "stopped",
 		"port":    "",
 	})
+}
+
+func (o *Orchestrator) handleProxyScreencast(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	tabID := r.URL.Query().Get("tabId")
+
+	o.mu.RLock()
+	inst, ok := o.instances[id]
+	o.mu.RUnlock()
+	if !ok || inst.Status != "running" {
+		web.Error(w, 404, fmt.Errorf("instance not found or not running"))
+		return
+	}
+
+	targetURL := fmt.Sprintf("ws://localhost:%s/screencast?tabId=%s", inst.Port, tabID)
+	web.JSON(w, 200, map[string]string{"wsUrl": targetURL})
 }
 
 func (o *Orchestrator) handleLogs(w http.ResponseWriter, r *http.Request) {
