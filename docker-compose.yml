@@ -9,6 +9,7 @@ services:
     volumes:
       - pinchtab-data:/data
     environment:
+      - BRIDGE_BIND=0.0.0.0
       - BRIDGE_PORT=9867
       - BRIDGE_HEADLESS=true
       - BRIDGE_TOKEN=${PINCHTAB_TOKEN:-}

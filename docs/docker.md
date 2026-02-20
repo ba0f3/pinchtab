@@ -48,6 +48,7 @@ docker run -d \
 ## Configuration
 
 Environment variables:
+- `BRIDGE_BIND` - Address to bind to (set to `0.0.0.0` in Docker)
 - `BRIDGE_PORT` - HTTP port (default: 9867)
 - `BRIDGE_TOKEN` - Auth token (optional)
 - `BRIDGE_HEADLESS` - Run Chrome headless (default: true in Docker)

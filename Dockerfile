@@ -36,7 +36,8 @@ USER pinchtab
 WORKDIR /data
 
 # Environment variables
-ENV BRIDGE_PORT=9867 \
+ENV BRIDGE_BIND=0.0.0.0 \
+    BRIDGE_PORT=9867 \
     BRIDGE_HEADLESS=true \
     BRIDGE_STATE_DIR=/data \
     BRIDGE_PROFILE=/data/chrome-profile \
