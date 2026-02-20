@@ -50,3 +50,11 @@ tab limit (`BRIDGE_MAX_TABS`, default 20), tab close error on bogus IDs.
 ## Not Doing
 Desktop app, plugin system, proxy rotation, SaaS, Selenium compat, MCP protocol,
 cloud anything, distributed clusters, workflow orchestration.
+
+## API Naming Cleanup
+- Clarify profile vs instance distinction in API routes
+- Profile = Chrome profile directory (has stable 12-char hex ID)
+- Instance = running Pinchtab process for a profile (has composite ID like "name-port")
+- Consider: `/profiles/{id}/start` returns an instance, `/instances/{id}/stop` uses instance ID — different ID spaces
+- Options: (a) unify around profile ID everywhere, (b) document clearly, (c) rename instance routes to avoid confusion
+- Dashboard JS mixes name-based and ID-based calls — could standardize on profile ID
