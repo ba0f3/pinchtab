@@ -11,16 +11,9 @@ import (
 
 func (pm *ProfileManager) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /profiles", pm.handleList)
-	mux.HandleFunc("POST /profiles", pm.handleCreate)
-	mux.HandleFunc("POST /profiles/import", pm.handleImport)
-	mux.HandleFunc("POST /profiles/reset", pm.handleReset)
-	mux.HandleFunc("DELETE /profiles", pm.handleDelete)
-	mux.HandleFunc("GET /profiles/logs", pm.handleLogs)
-	mux.HandleFunc("GET /profiles/analytics", pm.handleAnalytics)
-	mux.HandleFunc("PATCH /profiles/meta", pm.handleUpdateMeta)
-
-	// Dashboard-compatible aliases (path-param style)
 	mux.HandleFunc("POST /profiles/create", pm.handleCreate)
+	mux.HandleFunc("POST /profiles/import", pm.handleImport)
+	mux.HandleFunc("PATCH /profiles/meta", pm.handleUpdateMeta)
 	mux.HandleFunc("DELETE /profiles/{name}", pm.handleDeleteByPath)
 	mux.HandleFunc("PATCH /profiles/{name}", pm.handleUpdateByPath)
 	mux.HandleFunc("POST /profiles/{name}/reset", pm.handleResetByPath)
@@ -90,53 +83,6 @@ func (pm *ProfileManager) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.JSON(w, 200, map[string]string{"status": "imported", "name": req.Name})
-}
-
-func (pm *ProfileManager) handleReset(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		web.Error(w, 400, fmt.Errorf("name required"))
-		return
-	}
-	if err := pm.Reset(name); err != nil {
-		web.Error(w, 500, err)
-		return
-	}
-	web.JSON(w, 200, map[string]string{"status": "reset", "name": name})
-}
-
-func (pm *ProfileManager) handleDelete(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		web.Error(w, 400, fmt.Errorf("name required"))
-		return
-	}
-	if err := pm.Delete(name); err != nil {
-		web.Error(w, 500, err)
-		return
-	}
-	web.JSON(w, 200, map[string]string{"status": "deleted", "name": name})
-}
-
-func (pm *ProfileManager) handleLogs(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		web.Error(w, 400, fmt.Errorf("name required"))
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	logs := pm.Logs(name, limit)
-	web.JSON(w, 200, logs)
-}
-
-func (pm *ProfileManager) handleAnalytics(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		web.Error(w, 400, fmt.Errorf("name required"))
-		return
-	}
-	report := pm.Analytics(name)
-	web.JSON(w, 200, report)
 }
 
 func (pm *ProfileManager) handleUpdateMeta(w http.ResponseWriter, r *http.Request) {

@@ -123,6 +123,78 @@ All tests use `__test_profile__` — cleaned up at end.
 
 ---
 
+## 9. Endpoint Existence Checks
+
+Verify every registered route returns a non-404 status (may return 400/503 for missing params, but not 404 routing failures).
+
+### Dashboard / Health
+
+| # | Route | Method | Expected | Auto |
+|---|-------|--------|----------|------|
+| RE1 | `/health` | GET | 200 | ✅ |
+| RE2 | `/dashboard` | GET | 200 (HTML) | ✅ |
+| RE3 | `/dashboard/agents` | GET | 200 | ✅ |
+| RE4 | `/dashboard/events` | GET | 200 (SSE stream) | ✅ |
+| RE5 | `/shutdown` | POST | 200 (⚠️ kills dashboard) | 🔧 Manual |
+
+### Profiles
+
+| # | Route | Method | Expected | Auto |
+|---|-------|--------|----------|------|
+| RE6 | `/profiles` | GET | 200 | ✅ |
+| RE7 | `/profiles/create` | POST | 400 (no body) | ✅ |
+| RE8 | `/profiles/import` | POST | 400 (no body) | ✅ |
+| RE9 | `/profiles/meta` | PATCH | 400 (no body) | ✅ |
+| RE10 | `/profiles/__nonexistent__` | DELETE | 404 | ✅ |
+| RE11 | `/profiles/__nonexistent__` | PATCH | 400 (no body) | ✅ |
+| RE12 | `/profiles/__nonexistent__/reset` | POST | 404 | ✅ |
+| RE13 | `/profiles/__nonexistent__/logs` | GET | 200 (empty) | ✅ |
+| RE14 | `/profiles/__nonexistent__/analytics` | GET | 200 | ✅ |
+| RE15 | `/profiles/__nonexistent__/instance` | GET | 200 (running=false) | ✅ |
+| RE16 | `/profiles/__nonexistent__/stop` | POST | 404 | ✅ |
+
+### Orchestrator
+
+| # | Route | Method | Expected | Auto |
+|---|-------|--------|----------|------|
+| RE17 | `/instances` | GET | 200 | ✅ |
+| RE18 | `/instances/tabs` | GET | 200 | ✅ |
+| RE19 | `/instances/launch` | POST | 400 (no body) | ✅ |
+| RE20 | `/instances/nonexistent/stop` | POST | 404 | ✅ |
+| RE21 | `/instances/nonexistent/logs` | GET | 404 | ✅ |
+| RE22 | `/instances/nonexistent/proxy/screencast?tabId=x` | GET | 404 | ✅ |
+
+### Agent-friendly routes
+
+| # | Route | Method | Expected | Auto |
+|---|-------|--------|----------|------|
+| RE23 | `/start/000000000000` | POST | 404 (unknown profile ID) | ✅ |
+| RE24 | `/stop/000000000000` | POST | 404 (unknown profile ID) | ✅ |
+
+### Proxy endpoints (503 when no instance running)
+
+| # | Route | Method | Expected (no instance) | Auto |
+|---|-------|--------|------------------------|------|
+| RE25 | `/tabs` | GET | 503 | ✅ |
+| RE26 | `/snapshot` | GET | 503 | ✅ |
+| RE27 | `/screenshot` | GET | 503 | ✅ |
+| RE28 | `/text` | GET | 503 | ✅ |
+| RE29 | `/navigate` | POST | 503 | ✅ |
+| RE30 | `/action` | POST | 503 | ✅ |
+| RE31 | `/actions` | POST | 503 | ✅ |
+| RE32 | `/evaluate` | POST | 503 | ✅ |
+| RE33 | `/tab` | POST | 503 | ✅ |
+| RE34 | `/tab/lock` | POST | 503 | ✅ |
+| RE35 | `/tab/unlock` | POST | 503 | ✅ |
+| RE36 | `/cookies` | GET | 503 | ✅ |
+| RE37 | `/cookies` | POST | 503 | ✅ |
+| RE38 | `/stealth/status` | GET | 503 | ✅ |
+| RE39 | `/fingerprint/rotate` | POST | 503 | ✅ |
+| RE40 | `/screencast` | GET | 503 | ✅ |
+| RE41 | `/screencast/tabs` | GET | 503 | ✅ |
+
+---
+
 ## Release Criteria
 
 ### Must Pass
@@ -130,6 +202,7 @@ All tests use `__test_profile__` — cleaned up at end.
 - All Section 2 (profile CRUD) — no side effects on existing profiles
 - Section 3 DO1-DO11 (basic instance lifecycle)
 - Section 4 DX1-DX4 (proxy basics)
+- Section 9 RE1-RE41 (all endpoints reachable)
 
 ### Should Pass
 - Section 3 DO12-DO15 (advanced orchestration)

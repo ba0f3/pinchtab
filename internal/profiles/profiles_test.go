@@ -250,7 +250,7 @@ func TestProfileHandlerCreate(t *testing.T) {
 	pm.RegisterHandlers(mux)
 
 	body := `{"name": "new-profile"}`
-	req := httptest.NewRequest("POST", "/profiles", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/profiles/create", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -265,7 +265,7 @@ func TestProfileHandlerReset(t *testing.T) {
 	mux := http.NewServeMux()
 	pm.RegisterHandlers(mux)
 
-	req := httptest.NewRequest("POST", "/profiles/reset?name=resettable", nil)
+	req := httptest.NewRequest("POST", "/profiles/resettable/reset", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -280,7 +280,7 @@ func TestProfileHandlerDelete(t *testing.T) {
 	mux := http.NewServeMux()
 	pm.RegisterHandlers(mux)
 
-	req := httptest.NewRequest("DELETE", "/profiles?name=deletable", nil)
+	req := httptest.NewRequest("DELETE", "/profiles/deletable", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -339,7 +339,7 @@ func TestProfileCreateWithUseWhen(t *testing.T) {
 
 	// Create profile with useWhen
 	body := `{"name":"test-usewhen","useWhen":"For testing purposes"}`
-	req := httptest.NewRequest("POST", "/profiles", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/profiles/create", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
