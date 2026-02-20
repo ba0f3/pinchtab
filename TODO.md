@@ -21,22 +21,13 @@ tab limit (`BRIDGE_MAX_TABS`, default 20), tab close error on bogus IDs.
 
 ## Open
 
-### P4: Quality of Life
-- [ ] **Headed mode testing** — Run Section 2 tests to validate non-headless.
+### Minor
 - [ ] **Ad blocking** — Basic tracker blocking for cleaner snapshots.
-- [x] **Randomized window sizes** — Avoid automation fingerprint. (8 common resolutions, random per launch)
-
-### Code Quality
 - [ ] **installStableBinary streaming** — Use `io.Copy` with file streams instead of reading entire binary into memory.
 - [ ] **proxy_ws.go proper HTTP** — Replace raw `backend.Write` of HTTP headers with proper request construction.
-
-### Minor
 - [ ] **humanType global rand** — Accept `*rand.Rand` for reproducible tests.
 - [ ] **Canvas noise in headless** — `TestCanvasNoiseApplied` fails (headless Chrome limitation, `full` stealth only).
 - [ ] **`hardwareConcurrency` redefine warning** — Suppress warning during fingerprint rotation.
-
-### Release
-- [ ] **Tag v0.5.0** — Pre-release tests pass (67/74, 90.5% on main). Ready to tag.
 
 ---
 
