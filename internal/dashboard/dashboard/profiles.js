@@ -80,7 +80,12 @@ async function loadProfiles() {
     const cards = [];
 
     if (!health.mode) {
-      cards.push(renderMainCard(tabsData.tabs ? tabsData.tabs.length : 0));
+      // Not in dashboard mode — show a banner instead of the Main card
+      const banner = document.getElementById('bridge-mode-banner');
+      if (banner) banner.style.display = 'block';
+    } else {
+      const banner = document.getElementById('bridge-mode-banner');
+      if (banner) banner.style.display = 'none';
     }
 
     profiles.forEach(p => {
@@ -108,23 +113,7 @@ async function loadProfiles() {
   }
 }
 
-function renderMainCard(tabCount) {
-  return `
-    <div class="inst-card" style="border-color:var(--border-active)">
-      <div class="inst-header">
-        <span class="inst-name">🦀 Main</span>
-        <span class="inst-badge running">running :${location.port || '9867'}</span>
-      </div>
-      <div class="inst-body">
-        <div class="inst-row"><span class="label">Port</span><span class="value">${location.port || '9867'}</span></div>
-      </div>
-      <div class="inst-actions">
-        <button onclick="viewMainLive()">Live</button>
-        <button class="btn-feed" onclick="viewProfileInfo('main', '')">Info</button>
-      </div>
-    </div>
-  `;
-}
+// renderMainCard removed — Main is not a profile
 
 function renderProfileCard(profile, inst) {
   const name = profile.name;
