@@ -69,6 +69,18 @@ The Docker image:
 - Uses dumb-init for proper signal handling
 - Persists state in `/data` volume
 
+## Profiles & Dashboard Mode
+
+Docker runs Pinchtab in **bridge mode** — a single headless Chrome instance with one default profile. This is the intended setup for containers.
+
+The **profile management** feature (dashboard mode, multiple named Chrome profiles) is designed for **desktop/workstation** use where you might manage multiple browser identities from a GUI. It doesn't apply to Docker deployments:
+
+- Containers are ephemeral — profiles don't persist unless you mount `/data`
+- There's no user desktop or personal Chrome to coexist with
+- One container = one browser instance, which is the right model for automation
+
+If you need multiple isolated browser instances, run multiple containers rather than using the dashboard's profile system.
+
 ## Security Notes
 
 The container requires `--security-opt seccomp=unconfined` for Chrome to function properly. This is a limitation of running Chrome in containers.
