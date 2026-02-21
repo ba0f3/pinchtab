@@ -58,7 +58,7 @@ func runDashboard(cfg *config.RuntimeConfig) {
 		"/tabs", "/snapshot", "/screenshot", "/text",
 		"/navigate", "/action", "/actions", "/evaluate",
 		"/tab", "/tab/lock", "/tab/unlock",
-		"/cookies", "/stealth/status", "/fingerprint/rotate",
+		"/cookies", "/download", "/stealth/status", "/fingerprint/rotate",
 		"/screencast", "/screencast/tabs",
 	}
 	for _, ep := range proxyEndpoints {

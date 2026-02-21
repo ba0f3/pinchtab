@@ -371,6 +371,22 @@ curl "http://localhost:9867/text?mode=raw"
 
 Returns `{url, title, text}`. Cheapest option (~1K tokens for most pages).
 
+### Download files
+
+```bash
+# Download using browser session (preserves cookies, auth, stealth)
+# Returns base64 JSON by default
+curl "http://localhost:9867/download?url=https://site.com/report.pdf"
+
+# Raw bytes (pipe to file)
+curl "http://localhost:9867/download?url=https://site.com/image.jpg&raw=true" -o image.jpg
+
+# Save directly to disk
+curl "http://localhost:9867/download?url=https://site.com/export.csv&output=file&path=/tmp/export.csv"
+```
+
+Key use case: downloading files from authenticated sites — the browser's cookies and stealth settings are used automatically. No need to extract cookies and use curl separately.
+
 ### Screenshot
 
 ```bash
