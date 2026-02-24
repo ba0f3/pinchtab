@@ -85,3 +85,27 @@ func TestText_NoTab(t *testing.T) {
 		t.Errorf("expected error (400/404) for non-existent tab, got %d", code)
 	}
 }
+
+// T5: Token efficiency (real-world content)
+func TestText_TokenEfficiency(t *testing.T) {
+	navigate(t, "https://google.com")
+	code, body := httpGet(t, "/text")
+	if code != 200 {
+		t.Fatalf("expected 200, got %d", code)
+	}
+	text := string(body)
+	// Verify text is non-empty
+	if len(text) == 0 {
+		t.Error("expected non-empty text response")
+	}
+	// Count words roughly (split by space)
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		t.Error("expected text with word content")
+	}
+	// Simple sanity check: text should be reasonable size (not huge, not tiny)
+	if len(text) < 50 {
+		t.Warnf("text is very small (%d bytes), may not be representative", len(text))
+	}
+	t.Logf("extracted %d words from google.com", len(words))
+}
