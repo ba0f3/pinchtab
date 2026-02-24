@@ -13,9 +13,14 @@ func TestTabs_List(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected 200, got %d", code)
 	}
-	var tabs []any
-	if err := json.Unmarshal(body, &tabs); err != nil {
-		t.Fatalf("expected json array: %v", err)
+	var resp map[string]any
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("expected json object: %v", err)
+	}
+	tabsRaw := resp["tabs"]
+	tabs, ok := tabsRaw.([]any)
+	if !ok {
+		t.Fatalf("expected tabs to be an array, got %T", tabsRaw)
 	}
 	if len(tabs) == 0 {
 		t.Error("expected at least one tab")
@@ -34,9 +39,11 @@ func TestTabs_New(t *testing.T) {
 
 	// Verify tab count increased
 	_, listBody := httpGet(t, "/tabs")
-	var tabs []any
-	_ = json.Unmarshal(listBody, &tabs)
-	if len(tabs) < 2 {
+	var resp map[string]any
+	_ = json.Unmarshal(listBody, &resp)
+	tabsRaw := resp["tabs"]
+	tabs, ok := tabsRaw.([]any)
+	if !ok || len(tabs) < 2 {
 		t.Error("expected at least 2 tabs after creating new tab")
 	}
 }

@@ -41,19 +41,22 @@ func TestPDF_Raw(t *testing.T) {
 	}
 }
 
-// PD3: PDF save to file
+// PD3: PDF save to file (uses default state dir)
 func TestPDF_SaveFile(t *testing.T) {
 	navigate(t, "https://example.com")
-	tmp, _ := os.CreateTemp("", "pinchtab-test-*.pdf")
-	_ = tmp.Close()
-	defer os.Remove(tmp.Name()) //nolint:errcheck
-
-	code, body := httpGet(t, "/pdf?output=file&path="+tmp.Name())
+	code, body := httpGet(t, "/pdf?output=file")
 	if code != 200 {
 		t.Fatalf("expected 200, got %d (body: %s)", code, body)
 	}
-	info, err := os.Stat(tmp.Name())
+	// Response should have a path field pointing to where it was saved
+	path := jsonField(t, body, "path")
+	if path == "" {
+		t.Error("expected path field in response")
+		return
+	}
+	info, err := os.Stat(path)
 	if err != nil {
+		t.Logf("file path: %s", path)
 		t.Fatalf("file not created: %v", err)
 	}
 	if info.Size() < 100 {

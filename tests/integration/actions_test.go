@@ -191,20 +191,23 @@ func TestAction_Scroll(t *testing.T) {
 // Batch actions (A14)
 func TestAction_Batch(t *testing.T) {
 	navigate(t, "https://example.com")
-	actions := []map[string]string{
-		{"kind": "press", "key": "Escape"},
-		{"kind": "scroll", "direction": "down"},
+	payload := map[string]any{
+		"actions": []map[string]any{
+			{"kind": "press", "key": "Escape"},
+			{"kind": "scroll", "direction": "down"},
+		},
 	}
-	data, _ := json.Marshal(actions)
-	code, _ := httpPostRaw(t, "/actions", string(data))
+	data, _ := json.Marshal(payload)
+	code, body := httpPostRaw(t, "/actions", string(data))
 	if code != 200 {
+		t.Logf("batch response: %s", body)
 		t.Errorf("batch actions failed with %d", code)
 	}
 }
 
 // A15: Batch empty
 func TestAction_BatchEmpty(t *testing.T) {
-	code, _ := httpPostRaw(t, "/actions", "[]")
+	code, _ := httpPostRaw(t, "/actions", `{"actions": []}`)
 	if code != 400 {
 		t.Errorf("expected 400 for empty batch, got %d", code)
 	}

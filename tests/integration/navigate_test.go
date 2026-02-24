@@ -45,7 +45,7 @@ func TestNavigate_BadJSON(t *testing.T) {
 
 // N2: Navigate returns title
 func TestNavigate_ReturnsTitle(t *testing.T) {
-	code, body := httpPost(t, "/navigate", map[string]string{"url": "https://httpbin.org/html"})
+	code, body := httpPost(t, "/navigate", map[string]string{"url": "https://example.com"})
 	if code != 200 {
 		t.Fatalf("expected 200, got %d", code)
 	}
