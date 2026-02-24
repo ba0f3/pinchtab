@@ -26,7 +26,7 @@ func TestScreenshot_Raw(t *testing.T) {
 	navigate(t, "https://example.com")
 	code, body := httpGet(t, "/screenshot?raw=true")
 	if code != 200 {
-		t.Skipf("screenshot raw returned %d (headless display limitation), skipping")
+		t.Skipf("screenshot raw returned %d (headless display limitation), skipping", code)
 	}
 	// JPEG starts with FF D8
 	if len(body) < 2 || body[0] != 0xFF || body[1] != 0xD8 {
