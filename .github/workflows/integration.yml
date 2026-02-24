@@ -30,9 +30,21 @@ jobs:
           sudo apt-get install -y google-chrome-stable
           echo "CHROME_BINARY=/usr/bin/google-chrome" >> $GITHUB_ENV
 
+      - name: Install go-testreport
+        run: go install github.com/beheran/go-testreport@latest
+
       - name: Run integration tests
-        run: go test -tags integration -v -timeout 10m -count=1 ./tests/integration/
+        run: go test -tags integration -v -timeout 10m -count=1 -json ./tests/integration/ | tee integration-results.json | go-testreport -markdown >> $GITHUB_STEP_SUMMARY
         env:
           BRIDGE_HEADLESS: "true"
           BRIDGE_NO_RESTORE: "true"
           PINCHTAB_TEST_PORT: "19867"
+
+      - name: Integration test summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Integration Test Details" >> $GITHUB_STEP_SUMMARY
+          if [ -f integration-results.json ]; then
+            jq '.Summary' integration-results.json >> $GITHUB_STEP_SUMMARY || true
+          fi
