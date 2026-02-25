@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   pinchtab:
     build: .
@@ -9,10 +7,15 @@ services:
     volumes:
       - pinchtab-data:/data
     environment:
+      - BRIDGE_BIND=0.0.0.0
       - BRIDGE_PORT=9867
       - BRIDGE_HEADLESS=true
       - BRIDGE_TOKEN=${PINCHTAB_TOKEN:-}
+      - BRIDGE_STATE_DIR=/data
+      - BRIDGE_PROFILE=/data/chrome-profile
     restart: unless-stopped
+    # Shared memory is critical for Chrome stability
+    shm_size: '2gb'
     # Required for Chrome to work in container
     security_opt:
       - seccomp:unconfined

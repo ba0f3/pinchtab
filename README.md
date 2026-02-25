@@ -9,10 +9,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/lang-Go-00ADD8?style=flat-square" alt="Go"/>
+  <a href="https://github.com/pinchtab/pinchtab/releases/latest"><img src="https://img.shields.io/github/v/release/pinchtab/pinchtab?style=flat-square&color=FFD700" alt="Release"/></a>
+  <a href="https://github.com/pinchtab/pinchtab/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/pinchtab/pinchtab/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"/></a>
+  <img src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.25+"/>
+  <a href="https://github.com/pinchtab/pinchtab/blob/main/LICENSE"><img src="https://img.shields.io/github/license/pinchtab/pinchtab?style=flat-square&color=888" alt="License"/></a>
+  <a href="https://github.com/pinchtab/pinchtab/releases"><img src="https://img.shields.io/github/downloads/pinchtab/pinchtab/total?style=flat-square&color=00ff88&label=downloads" alt="Downloads"/></a>
   <img src="https://img.shields.io/badge/binary-12MB-FFD700?style=flat-square" alt="12MB"/>
-  <img src="https://img.shields.io/badge/interface-HTTP-00ff88?style=flat-square" alt="HTTP"/>
-  <img src="https://img.shields.io/badge/license-MIT-888?style=flat-square" alt="MIT"/>
+  <a href="https://x.com/pinchtabdev"><img src="https://img.shields.io/badge/follow-@pinchtabdev-000?style=flat-square&logo=x&logoColor=white" alt="X/Twitter"/></a>
 </p>
 
 ---
@@ -66,53 +69,131 @@ Your agent can clone, build, and configure Pinchtab using the [OpenClaw skill](s
 
 ```bash
 # Build
-go build -o pinchtab .
+go build -o pinchtab ./cmd/pinchtab
 
-# Headed mode (default) — Chrome window visible, human can watch and interact
+# Headless mode (default) — no window, pure automation (best for token-efficient API flows)
 ./pinchtab
 
-# Headless mode — no window, pure automation
-BRIDGE_HEADLESS=true ./pinchtab
+# Headed mode — visible window for operator-in-the-loop flows
+BRIDGE_HEADLESS=false ./pinchtab
 ```
 
-### Headless Mode (recommended)
+### Run Modes
+
+| Mode | Command | Notes |
+|---|---|---|
+| Headless (default) | `./pinchtab` | Launches managed Chrome without UI |
+| Headed | `BRIDGE_HEADLESS=false ./pinchtab` | Launches managed Chrome with visible window |
+| Dashboard / orchestrator | `./pinchtab dashboard` | Runs control plane only (profiles + instances), no browser in dashboard process |
+| Remote CDP | `CDP_URL=http://localhost:9222 ./pinchtab` | Connects to an existing Chrome instead of launching one |
+
+Common runtime options:
+
+```bash
+# Custom port
+BRIDGE_PORT=9870 ./pinchtab
+
+# Custom profile directory
+BRIDGE_PROFILE=/path/to/profile ./pinchtab
+
+# Enable API auth
+BRIDGE_TOKEN=your-secret-token ./pinchtab
+```
+
+### Headless Mode
 
 <img src="assets/pinchtab-headless.png" width="64" alt="Pinchtab" />
 
-The primary mode. Chrome runs invisibly in the background — no window, pure API. This is what Pinchtab is built and tested for. Best for servers, CI, Docker, and unattended automation.
+Chrome runs invisibly in the background — no window, pure API. Best for servers, CI, Docker, and unattended automation. Token savings come from using `/text` and filtered snapshot formats (`/snapshot?filter=interactive&format=compact`) rather than vision/screenshot-heavy flows.
 
 ```bash
-BRIDGE_HEADLESS=true ./pinchtab
+./pinchtab
 ```
 
-All 100+ tests run against headless. The full API surface is validated here.
+All core API flows are validated in headless mode.
 
-### Headed Mode (experimental)
+### Remote Chrome via CDP_URL
+
+Instead of launching your own Chrome, connect to an existing instance:
+
+```bash
+# Start Chrome with debugging enabled (localhost only)
+chrome --remote-debugging-port=9222 &
+
+# Get the WebSocket URL
+CDP_URL=$(curl http://localhost:9222/json/version | jq -r '.webSocketDebuggerUrl')
+
+# Connect Pinchtab to it
+export CDP_URL
+./pinchtab
+```
+
+**Use cases:**
+- 🤝 **Multi-agent resource sharing** — All agents share one Chrome (save 1.3GB per agent)
+- 🧪 **Integration testing** — Multiple test scripts use the same browser and session
+- 🐳 **Docker/containers** — Chrome in one container, Pinchtab in another
+
+**⚠️ Security:** Chrome's DevTools Protocol has no authentication. Only expose the CDP port locally or via SSH tunnel. See **[docs/cdp-url-shared-chrome.md#security](docs/cdp-url-shared-chrome.md#security)** for details.
+
+See **[docs/cdp-url-shared-chrome.md](docs/cdp-url-shared-chrome.md)** for detailed setup and use cases.
+
+### Headed Mode (operator-in-the-loop)
 
 <img src="assets/pinchtab-headed.png" width="128" alt="Pinchtab headed mode" />
 
-Chrome opens as a visible window. Useful for debugging, watching agents work, and manually logging into sites. Shows the Pinchtab mascot on the welcome page.
+Headed mode is for mixed human + agent workflows:
 
+- Human signs in, solves captchas/2FA, validates page state
+- Agent continues through HTTP API against the same profile
+- Team can watch automation behavior in real time
+
+See **[docs/headed-mode-guide.md](docs/headed-mode-guide.md)** for use cases of the headed mode.
+
+You can run headed mode in two ways:
+
+1. Single local instance:
 ```bash
-./pinchtab  # headed is the default
+BRIDGE_HEADLESS=false ./pinchtab
 ```
 
-> **⚠️ Headed mode is not fully tested.** It works for basic use but expect rough edges:
->
-> - **Profile management is manual** — Pinchtab uses its own Chrome profile (`~/.pinchtab/chrome-profile/`), separate from your regular Chrome. To access sites that need login, you must either log in manually in the Pinchtab window, or copy your existing Chrome profile:
->   ```bash
->   # Copy your Chrome profile (while Chrome is closed)
->   cp -r ~/Library/Application\ Support/Google/Chrome/Default ~/.pinchtab/chrome-profile
->   # Or point to a custom location
->   BRIDGE_PROFILE=/path/to/profile ./pinchtab
->   ```
-> - **Two Chrome instances can't share a profile** — if your regular Chrome is open, you must use a copied profile, not the original
-> - **Some sites detect automation differently in headed mode** — stealth behaviour may vary
-> - **Window management is not handled** — Chrome opens wherever the OS puts it
+2. Dashboard-managed profiles (recommended for headed ops):
+```bash
+./pinchtab dashboard
+```
+Open `http://localhost:9867/dashboard` and:
+- create/import profiles
+- launch headed instances per profile/port
+- stop profiles gracefully
+- open Live popup for a specific running profile
+- inspect Info (status, tabs, feed summary, logs)
+
+When a profile is launched, your agent targets that profile instance URL (for example `http://localhost:9868`), not the dashboard URL.
+
+Helper command to resolve a running profile URL from dashboard state:
+
+```bash
+pinchtab connect <profile-name>
+# -> http://localhost:<profile-port>
+```
+
+Recommended human + agent flow:
+
+```bash
+# human operator
+pinchtab dashboard
+# create/import profile, then launch it from the dashboard
+
+# agent process
+PINCHTAB_BASE_URL="$(pinchtab connect <profile-name>)"
+curl "$PINCHTAB_BASE_URL/health"
+```
 
 ### First-Time Login
 
-Pinchtab uses a persistent profile at `~/.pinchtab/chrome-profile/`. In headed mode, log into sites via the Chrome window that opens — cookies persist across restarts. In headless mode, either copy an existing profile or use the cookie API (`POST /cookies`) to inject session cookies programmatically.
+Pinchtab keeps persistent profiles. Default single-instance profile: `~/.pinchtab/chrome-profile/`.
+Dashboard-managed profiles: `~/.pinchtab/profiles/<profile-name>/`.
+
+In headed mode, log into sites in the visible Chrome window once; cookies and local storage persist across restarts. In headless mode, either copy an existing profile or inject cookies via `POST /cookies`.
 
 ## Features
 
@@ -137,6 +218,7 @@ Pinchtab uses a persistent profile at `~/.pinchtab/chrome-profile/`. In headed m
 | `GET` | `/tabs` | List open tabs |
 | `GET` | `/snapshot` | Accessibility tree (primary interface) |
 | `GET` | `/screenshot` | JPEG screenshot (opt-in) |
+| `GET` | `/pdf` | PDF export of current page |
 | `GET` | `/text` | Readable page text (readability or raw) |
 | `POST` | `/navigate` | Go to URL |
 | `POST` | `/action` | Click, type, fill, press, focus, hover, select, scroll |
@@ -144,6 +226,8 @@ Pinchtab uses a persistent profile at `~/.pinchtab/chrome-profile/`. In headed m
 | `POST` | `/tab` | Open/close tabs |
 | `POST` | `/tab/lock` | Lock tab for exclusive agent access |
 | `POST` | `/tab/unlock` | Release tab lock |
+| `POST` | `/upload` | Set files on `<input type=file>` elements |
+| `GET` | `/download` | Download URL using browser session |
 
 ### Query Parameters (snapshot)
 | Param | Description |
@@ -168,34 +252,108 @@ Pinchtab uses a persistent profile at `~/.pinchtab/chrome-profile/`. In headed m
 | `noAnimations=true` | Disable CSS animations before capture |
 | `output=file` | Save screenshot to disk instead of returning |
 
+### Query Parameters (pdf)
+| Param | Description |
+|-------|-------------|
+| `tabId` | Target tab (default: first tab) |
+| `landscape=true` | Landscape orientation |
+| `scale=N` | Print scale (default: 1.0) |
+| `raw=true` | Return raw PDF bytes |
+| `output=file` | Save PDF to disk |
+| `path=/custom/path` | Custom file path (with `output=file`) |
+
 ### Query Parameters (text)
 | Param | Description |
 |-------|-------------|
 | `tabId` | Target tab (default: first tab) |
 | `mode=raw` | Raw `innerText` instead of readability extraction |
 
+## CLI
+
+The same `pinchtab` binary doubles as a CLI client. Start the server, then use subcommands:
+
+```bash
+pinchtab nav https://example.com        # Navigate
+pinchtab snap -i -c                      # Snapshot (interactive, compact)
+pinchtab click e5                        # Click element by ref
+pinchtab type e12 hello world            # Type into element
+pinchtab press Enter                     # Press key
+pinchtab text                            # Extract readable text
+pinchtab ss -o page.jpg                  # Screenshot
+pinchtab eval "document.title"           # Run JavaScript
+pinchtab pdf -o page.pdf --landscape     # Export PDF
+pinchtab tabs                            # List tabs
+pinchtab tabs new https://example.com    # Open new tab
+pinchtab health                          # Check server
+```
+
+Short aliases: `nav`, `snap`, `ss`, `eval`, `tab`. Config via `PINCHTAB_URL` and `PINCHTAB_TOKEN` env vars. Pipe output with `jq`:
+
+```bash
+pinchtab text | jq .text
+pinchtab snap -i -c | jq '.[] | select(.name | contains("Login"))'
+```
+
+Full help: `pinchtab help`
+
 ## Configuration
 
-All via environment variables:
+### Core runtime
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `BRIDGE_BIND` | `127.0.0.1` | Bind address — localhost only by default. Set to `0.0.0.0` for network access |
 | `BRIDGE_PORT` | `9867` | HTTP server port |
-| `BRIDGE_TOKEN` | *(none)* | Bearer token for auth |
-| `BRIDGE_HEADLESS` | `false` | Run Chrome headless (no window) |
+| `BRIDGE_TOKEN` | *(none)* | Bearer token for auth (recommended when using `BRIDGE_BIND=0.0.0.0`) |
+| `BRIDGE_HEADLESS` | `true` | Run Chrome headless (no window) |
 | `BRIDGE_PROFILE` | `~/.pinchtab/chrome-profile` | Chrome profile directory |
 | `BRIDGE_STATE_DIR` | `~/.pinchtab` | State/session storage |
 | `BRIDGE_NO_RESTORE` | `false` | Skip restoring tabs from previous session |
 | `BRIDGE_STEALTH` | `light` | Stealth level: `light` (basic) or `full` (canvas/WebGL/font spoofing) |
+| `BRIDGE_MAX_TABS` | `20` | Max open tabs (0 = unlimited) |
 | `BRIDGE_BLOCK_IMAGES` | `false` | Block image loading |
 | `BRIDGE_BLOCK_MEDIA` | `false` | Block all media (images + fonts + CSS + video) |
 | `BRIDGE_NO_ANIMATIONS` | `false` | Disable CSS animations/transitions globally |
+| `BRIDGE_TIMEZONE` | *(none)* | Force browser timezone (IANA tz, e.g. `Europe/Rome`) |
+| `BRIDGE_CHROME_VERSION` | `144.0.7559.133` | Chrome version string used by fingerprint rotation profiles |
+| `BRIDGE_USER_AGENT` | (none) | Custom User-Agent string; also overrides Sec-Ch-Ua client hints via CDP |
 | `BRIDGE_TIMEOUT` | `15` | Action timeout (seconds) |
 | `BRIDGE_NAV_TIMEOUT` | `30` | Navigation timeout (seconds) |
 | `BRIDGE_CONFIG` | `~/.pinchtab/config.json` | Path to config JSON file |
 | `CHROME_BINARY` | *(auto)* | Path to Chrome/Chromium binary |
 | `CHROME_FLAGS` | *(none)* | Extra Chrome flags (space-separated) |
 | `CDP_URL` | *(none)* | Connect to existing Chrome instead of launching |
+| `BRIDGE_NO_DASHBOARD` | `false` | Disable embedded dashboard/orchestrator endpoints on instance processes |
+
+### Dashboard mode (`./pinchtab dashboard`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PINCHTAB_AUTO_LAUNCH` | `false` | Auto-launch a default profile instance at dashboard startup |
+| `PINCHTAB_DEFAULT_PROFILE` | `default` | Profile name used by auto-launch |
+| `PINCHTAB_DEFAULT_PORT` | `9867` | Port used by auto-launch |
+| `PINCHTAB_HEADED` | *(unset)* | If set, auto-launched instance is headed; unset means headless |
+| `PINCHTAB_DASHBOARD_URL` | `http://localhost:$BRIDGE_PORT` | CLI helper base URL for `pinchtab connect` |
+
+## Headed Mode: Human + Agent Workflows
+
+Headed mode lets humans and agents share the same browser session. Human logs in, handles 2FA and CAPTCHAs. Agent takes over via HTTP API — same cookies, same session. Profiles persist across restarts, so you log in once and automate forever.
+
+The dashboard exposes `POST /start/{id}` and `POST /stop/{id}` for easy profile lifecycle management — agents can spin up a profile, do their work, and shut it down with three API calls.
+
+See **[docs/headed-mode-guide.md](docs/headed-mode-guide.md)** for the full walkthrough with real examples.
+
+## Identifying Pinchtab Chrome Instances
+
+Need to distinguish Pinchtab's Chrome from your regular browser? Use `CHROME_BINARY` to point at a renamed Chrome copy, `CHROME_FLAGS` to tag instances in `ps`, or rely on the separate profile directory that's already built-in.
+
+See **[docs/identifying-instances.md](docs/identifying-instances.md)** for the full guide with examples.
+
+## Chrome Lifecycle & Orchestration
+
+Pinchtab doesn't just run Chrome — it manages hardened, detection-resistant instances with pre-flight stealth injection, automatic lock file cleanup, retry logic, and per-tab context lifecycle management.
+
+See **[docs/chrome-lifecycle.md](docs/chrome-lifecycle.md)** for the full deep dive covering allocator strategy, launch flag hardening, instance orchestration, and tab management.
 
 ## Architecture
 
@@ -208,6 +366,8 @@ All via environment variables:
 │   scripts)  │                   │  a11y tree   │                │         │
 └─────────────┘                   └──────────────┘                └─────────┘
 ```
+
+See **[docs/pinchtab-architecture.md](docs/pinchtab-architecture.md)**
 
 ## Why Not Screenshots?
 
@@ -270,7 +430,7 @@ go install github.com/pinchtab/pinchtab@latest
 # Or clone and build
 git clone https://github.com/pinchtab/pinchtab.git
 cd pinchtab
-go build -o pinchtab .
+go build -o pinchtab ./cmd/pinchtab
 ```
 
 ## Development
@@ -278,7 +438,7 @@ go build -o pinchtab .
 ```bash
 git clone https://github.com/pinchtab/pinchtab.git
 cd pinchtab
-go build -o pinchtab .
+go build -o pinchtab ./cmd/pinchtab
 ./pinchtab
 
 # Run tests (38 tests)
@@ -297,6 +457,7 @@ When you log into sites through Pinchtab's Chrome window, those sessions — coo
 - **Set `BRIDGE_TOKEN`** — without it, anyone on your network can control your browser. In production, this is non-negotiable.
 - **Treat `~/.pinchtab/` as sensitive** — it contains your Chrome profile with all saved sessions and cookies. Guard it like you'd guard your passwords.
 - **Pinchtab binds to all interfaces by default** — use a firewall or reverse proxy if you're on a shared network.
+- **If using `CDP_URL`:** Chrome's DevTools Protocol has no authentication. **Never expose the CDP port to the network.** Only use localhost or SSH tunnels. See [docs/cdp-url-shared-chrome.md#security](docs/cdp-url-shared-chrome.md#security) for details.
 - **Start with low-risk accounts.** Don't point an experimental agent at your primary email or bank account on day one. Test with throwaway accounts first.
 - **No data leaves your machine** — all processing is local. But the agents you connect might send data wherever they want.
 
@@ -336,4 +497,3 @@ Pinchtab is built to work seamlessly with [OpenClaw](https://openclaw.ai) — th
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=pinchtab/pinchtab&type=Date" />
  </picture>
 </a>
-

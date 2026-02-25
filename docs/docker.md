@@ -48,6 +48,7 @@ docker run -d \
 ## Configuration
 
 Environment variables:
+- `BRIDGE_BIND` - Address to bind to (set to `0.0.0.0` in Docker)
 - `BRIDGE_PORT` - HTTP port (default: 9867)
 - `BRIDGE_TOKEN` - Auth token (optional)
 - `BRIDGE_HEADLESS` - Run Chrome headless (default: true in Docker)
@@ -67,6 +68,18 @@ The Docker image:
 - Runs as non-root user
 - Uses dumb-init for proper signal handling
 - Persists state in `/data` volume
+
+## Profiles & Dashboard Mode
+
+Docker runs Pinchtab in **bridge mode** — a single headless Chrome instance with one default profile. This is the intended setup for containers.
+
+The **profile management** feature (dashboard mode, multiple named Chrome profiles) is designed for **desktop/workstation** use where you might manage multiple browser identities from a GUI. It doesn't apply to Docker deployments:
+
+- Containers are ephemeral — profiles don't persist unless you mount `/data`
+- There's no user desktop or personal Chrome to coexist with
+- One container = one browser instance, which is the right model for automation
+
+If you need multiple isolated browser instances, run multiple containers rather than using the dashboard's profile system.
 
 ## Security Notes
 
